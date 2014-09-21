@@ -12,7 +12,7 @@ function __autoload($classname) {
 }
 
 // Finding a controller and an action appropriate for the URI
-Subframe\Controller::action(null, null, ROOT.HOME."../application/controllers/", '/Users/ante/Sites/subframe/v5.3/application/views/');//ROOT.HOME."../views/");
+Subframe\Controller::action(null, null, ROOT.HOME."../application/controllers/", ROOT.HOME."../views/");
 
 // If no appropriate action found, it's a "404 Not Found" error
 Subframe\Controller::view('error', array('error' => 'Sorry, no content found at this address!'), 404);
