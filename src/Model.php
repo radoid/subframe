@@ -146,6 +146,35 @@ class Model {
 	}
 
 	/**
+	 * Fetches one or more records by their ID(s)
+	 * @param string|string[] $id The ID(s) to look for
+	 * @return static|static[]|null The record(s) if found, or null
+	 */
+	public static function get($id) {
+		$sql = "SELECT * FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
+		if (!is_array($id))
+			return static::fetch("$sql LIMIT 1");
+		elseif ($id)
+			return static::fetchAll($sql);
+		return [];
+	}
+
+	/**
+	 * Fetches all records, optionally paged, optionally with keys from a column
+	 * @param int $limit Optionally, maximum number of records
+	 * @param string|null $after_id Optionally, the last ID from the previous request
+	 * @param int $page
+	 * @return static[]|null
+	 */
+	public static function getAll($limit = 0, $after_id = 0, $page = 0) {
+		$sql = "SELECT * FROM ".static::TABLE
+				.($after_id ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
+				." ORDER BY ".static::KEY.($limit >= 0 ? " ASC":" DESC")
+				.($limit ? " LIMIT ".($page ? abs($page*$limit).',':'') . abs($limit) : "");
+		return static::fetchAll($sql);
+	}
+
+	/**
 	 * Fetches a record by direct SQL query
 	 * @param PDOStatement|string $q The query as an SQL string or PDOStatement
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
