@@ -168,6 +168,36 @@ class Controller {
 	}
 
 	/**
+	 * Sets the ETag header and triggers the 304 response if it matches to the requested ETag
+	 * @param string $etag The ETag value
+	 */
+	protected static function setETag($etag) {
+		if (($before = $_SERVER['HTTP_IF_NONE_MATCH'] ?? ''))
+			if ($before == $etag) {
+				header_remove();
+				http_response_code(304); // 304 Not Modified
+				exit;
+			}
+		
+		header("ETag: $etag");
+	}
+
+	/**
+	 * Sets the Last-Modified header and triggers the 304 response if timestamp not newer then requested
+	 * @param int $timestamp The Unix timestamp
+	 */
+	protected static function setLastModified($timestamp) {
+		if (($before = $_SERVER['HTTP_IF_MODIFIED_SINCE']))
+			if (strtotime($before) >= $timestamp) {
+				header_remove();
+				http_response_code(304); // 304 Not Modified
+				exit;
+			}
+		
+		header('Last-Modified: '.date('r', $timestamp));
+	}
+
+	/**
 	 * Changes case of the argument as if it was a class name (capital letter on each word boundary)
 	 * @param string $arg The argument
 	 * @return string The result
