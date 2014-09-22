@@ -37,10 +37,11 @@ and project-specific classes should be kept in `application/libraries` folder, s
 The framework requires the user to implement autoloading function in the main `index.php` (the "front controller").
 A minimal example is included. The simplest `index.php` (for the folder structure suggested above) could be as follows:
 
+	<?php
 	define ('ROOT', $_SERVER['DOCUMENT_ROOT']);
 	define ('HOME', rtrim(dirname($_SERVER['SCRIPT_NAME']), '/').'/');
 
-	// Auto-loading mechanism written as a part of the configuration
+	// Auto-loading mechanism written as a sort of a configuration set
 	function __autoload($classname) {
 		(@include ROOT.HOME."../application/models/$classname.php")
 			or (@include ROOT.HOME."../application/libraries/$classname.php")
@@ -49,7 +50,10 @@ A minimal example is included. The simplest `index.php` (for the folder structur
 	}
 
 	// Finding a controller and an action appropriate for the URI
-	Subframe\Controller::action(null, null, ROOT.HOME.'../application/controllers/', ROOT.HOME.'../views/');
+	Subframe\Controller::action(null, null,
+			ROOT.HOME.'../application/controllers/',
+			ROOT.HOME.'../application/views/');
 
 	// If no appropriate action was found, it's a "404 Not Found" situation
-	Subframe\Controller::view('error', array('error' => 'Sorry, no content found at this address.'), 404);
+	header('HTTP/1.1 404 Not Found');
+	echo 'Sorry, no content found at this address.';

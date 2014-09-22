@@ -9,14 +9,11 @@ namespace Subframe;
 class Controller
 {
 	protected $argv, $controller, $action, $args;
+
 	static $controllers, $views, $cache;
 
 	function __construct(array $argv = null) {
 		$this->argv = $argv;
-		/*$this->cache = self::$cache;
-		$this->controllers = self::$controllers;
-		$this->views = self::$views;*/
-		//if (method_exists ($this, $this->action) || method_exists ($this, "__call")) /*&& is_callable (array ($classname, $action))*/) {
 	}
 
 	static function action($argv = null, $cache = null, $controllers = "", $views = "") {
@@ -55,27 +52,26 @@ class Controller
 			}
 		}
 
-		//if ((class_exists ($classname, false) || ((@include_once self::$controllers."$classname.php") && class_exists ($classname)))
-		if (((($classname = ucfirst($argv[1]) . "Controller") && is_file(self::$controllers . "$classname.php") && (include_once self::$controllers . "$classname.php"))
-						|| (($classname = ucfirst($argv[1])) && is_file(self::$controllers . "$classname.php") && (include_once self::$controllers . "$classname.php")))
+		$method = strtolower($_SERVER['REQUEST_METHOD']);
+		if (($classname = ucfirst($argv[1]))
+				&& is_file(self::$controllers . "$classname.php")
+				&& (include_once self::$controllers . "$classname.php")
 				&& class_exists($classname, false)
-				&& ($instance = new $classname ($argv))
-				&& (method_exists($instance, $action = "$argv[2]Action")
+				&& ($instance = new $classname($argv))
+				&& (method_exists($instance, $action = $method.ucfirst($argv[2]))
 						|| method_exists($instance, $action = $argv[2])
-						|| method_exists($instance, "__call")
+						|| (count($argv) > 3 && method_exists($instance, $method.ucfirst($argv[3])) && list($action, $argv[3]) = array($method.ucfirst($argv[3]), $argv[2]))
 						|| (count($argv) > 3 && method_exists($instance, $argv[3]) && list($action, $argv[3]) = array($argv[3], $argv[2]))
-						|| (count($argv) >= 3 && method_exists($instance, 'single') && !array_splice($argv, 2, 0, $action = 'single')))
-		) {
-			//die("action: $action, args: ".json_encode(array_slice($argv, 3)));
+						|| (count($argv) >= 3 && method_exists($instance, $method.'Single') && !array_splice($argv, 2, 0, $action = $method.'Single'))
+						|| (count($argv) >= 3 && method_exists($instance, 'single') && !array_splice($argv, 2, 0, $action = 'single'))
+						|| method_exists($instance, "__call")
+		)) {
 			if ($cachename)
 				ob_start();
 			try {
-				//if (method_exists ($instance, "before"))
-				//	$instance->before ();
 				call_user_func_array(array($instance, $action), array_slice($argv, 3));
-				//if (method_exists ($instance, "after"))
-				//	$instance->after ();
 			} catch (Exception $e) {
+				header('HTTP/1.1 500 Server Error');
 				trigger_error(htmlspecialchars($e), E_USER_ERROR);
 			}
 			if ($cachename)
@@ -84,27 +80,15 @@ class Controller
 		}
 	}
 
-	function template($filename, $data = array(), $status = 200) {
-		$this->view($filename, $data, $status);
-	}
-
-	function ob_template($filename, $data = array(), $status = 200) {
-		return $this->ob_view($filename, $data, $status);
-	}
-
-	function view($_filename, $_data = array(), $_status = 200) {
-		//$_controller = $page = @$this->argv[1]; //strtolower (get_called_class ());//
-		//$_action = $subpage = @$this->argv[2]; //$this->action;
+	protected function view($_filename, $_data = array(), $_status = 200) {
+		$_controller = @$this->argv[1];
+		$_action = @$this->argv[2];
 		if (is_array($_data))
 			extract($_data);
-		elseif (is_string($_data))
-			$errors = array($_data);
-		if (isset($errors) && is_string($errors))
-			$errors = array($errors);
 		if (is_string($_status))
 			header("HTTP/1.1 $_status");
 		elseif (is_numeric($_status) && $_status != 200)
-			header("HTTP/1.1 $_status " . @reset($errors));
+			header("HTTP/1.1 $_status Unexpected Error");
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE);
 		//$include_path = set_include_path(self::$views);
 		(include self::$views."$_filename.php")
@@ -113,26 +97,20 @@ class Controller
 		error_reporting($error_reporting);
 	}
 
-	function ob_view($view_filename, $view_data = array(), $view_status = 200) {
+	protected function ob_view($view_filename, $view_data = array(), $view_status = 200) {
 		ob_start ();
 		$this->view($view_filename, $view_data);
 		return ob_get_clean ();
 	}
 
-	function json($data = array(), $status = 200) {
-		if (is_object($data))
-			$data = (array)$data;
-		elseif (!is_array($data))
-			$data = array('errors' => array($data));
-		if (isset ($data['errors']) && !is_array($data['errors']))
-			$data['errors'] = array($data['errors']);
+	protected function json($data = array(), $status = 200) {
 		if (is_string($status))
 			@header("HTTP/1.1 $status");
 		elseif ($status && $status != 200)
-			@header("HTTP/1.1 $status " . ($data['errors'] ? str_replace("\n", "\0", reset($data['errors'])) : "Error"));
+			@header("HTTP/1.1 $status Unexpected Error");
 		if ($status)
 			@header("Content-Type: application/json; charset=utf-8");
-		echo json_encode($data + array('timestamp' => time(), 'errors' => array()));
+		echo json_encode($data);
 	}
 
 	/**

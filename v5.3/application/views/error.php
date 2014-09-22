@@ -7,6 +7,6 @@
 
 <h1>Error!</h1>
 
-<p><?=htmlspecialchars($error)?></p>
+<p><strong><?=htmlspecialchars($error)?></strong></p>
 
 <p>This is an example of a template file named <code>error.php</code> in <code>application/views</code> folder.</p>

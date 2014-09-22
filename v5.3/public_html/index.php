@@ -8,11 +8,21 @@ function __autoload($classname) {
 	(@include ROOT.HOME."../application/models/$classname.php")
 		or (@include ROOT.HOME."../application/libraries/$classname.php")
 			or (@include ROOT.HOME."../vendor/" . str_replace('\\', '/', "$classname.php"))
-				or trigger_error("Class $classname not found", E_USER_ERROR);
+				or trigger_error("Class $classname not found.", E_USER_ERROR);
 }
 
-// Finding a controller and an action appropriate for the URI
-Subframe\Controller::action(null, null, ROOT.HOME."../application/controllers/", ROOT.HOME."../views/");
+// Minimal front-controller class (the application)
+class Application extends Subframe\Controller
+{
+	function __construct() {
+		// Finding a controller-action pair appropriate for the URI
+		self::action(null, null,
+			ROOT.HOME."../application/controllers/",
+			ROOT.HOME."../application/views/");
 
-// If no appropriate action found, it's a "404 Not Found" error
-Subframe\Controller::view('error', array('error' => 'Sorry, no content found at this address!'), 404);
+		// If no appropriate action found, it's a "404 Not Found" situation
+		$this->view('error', array('error' => 'Sorry, no content found at this address.'), 404);
+	}
+}
+
+new Application;
