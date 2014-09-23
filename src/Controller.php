@@ -41,6 +41,23 @@ class Controller {
 	}
 
 	/**
+	 * Flushes the response to the client, e.g. to allow a long processing task to continue
+	 * @param string $url The URL to go to
+	 * @param int $code HTTP status code, such as 301; defaults to 302
+	 */
+	protected function finish() {
+		while (ob_get_level())
+			ob_end_flush();
+		flush();
+		ignore_user_abort(true);
+		set_time_limit(0);
+		if (function_exists('fastcgi_finish_request')) {
+			session_write_close();
+			fastcgi_finish_request();
+		}
+	}
+
+	/**
 	 * Redirects the request to another URL
 	 * @param string $url The URL to go to
 	 * @param int $code HTTP status code, such as 301; defaults to 302
