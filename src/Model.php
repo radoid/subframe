@@ -165,6 +165,16 @@ class Model {
 	}
 
 	/**
+	 * Inserts the object into the DB table, updating the existing record if there's a duplicate key
+	 * @return int The number of rows affected
+	 */
+	public function upsert() {
+		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
+				ON DUPLICATE KEY UPDATE $this";
+		return self::$pdo->exec($sql);
+	}
+
+	/**
 	 * Inserts the object into the DB table, fully replacing the existing record if there's a duplicate key
 	 * @return int The number of rows affected
 	 */
@@ -197,6 +207,16 @@ class Model {
 			return 0;
 		$sql = "DELETE FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
 		return self::$pdo->exec($sql);
+	}
+
+	/**
+	 * Tells whether any records exist having given ID(s)
+	 * @param string|string[] $id ID(s) to look for
+	 * @return boolean
+	 */
+	public static function exists($id) {
+		$sql = "SELECT 1 FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).") LIMIT 1";
+		return self::result($sql);
 	}
 
 	/**
