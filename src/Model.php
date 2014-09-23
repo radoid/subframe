@@ -62,6 +62,28 @@ class Model {
 	}
 
 	/**
+	 * Adds all fields from the given object/array to the actual object
+	 * @param array|object $data object or associative array with data
+	 * @return $this
+	 */
+	public function merge($data) {
+		foreach ($data as $key => $value)
+			$this->$key = $value;
+		return $this;
+	}
+
+	/**
+	 * Removes null fields from the object
+	 * @return $this
+	 */
+	public function trim() {
+		foreach ($this as $key => $value)
+			if (!isset($this->$key))
+				unset($this->$key);
+		return $this;
+	}
+
+	/**
 	 * Represents the object with a string, suitably for use in SQL queries
 	 * @return string The SQL compatible string
 	 */
@@ -95,6 +117,38 @@ class Model {
 			if (isset($value))
 				$values .= ($values ? ", " : "") . (is_float($value) && is_nan($value) ? "NULL" : self::quote($value));
 		return $values;
+	}
+
+	/**
+	 * Extracts one field across multiple objects, optionally indexing the resulting array
+	 * @param array $objects The objects containing the field
+	 * @param string $field The field to be extracted
+	 * @param string|null $key Optionally, the field to serve as the array key
+	 * @return array
+	 */
+	public static function column($objects, $field, $key = '') {
+		$array = [];
+		$i = 0;
+		foreach ($objects as $object)
+			$array[$key ? $object->$key : $i++] = $object->$field;
+		return $array;
+	}
+
+	/**
+	 * Extracts multiple fields across single or multiple objects, optionally indexing the result
+	 * @param array|object $objects The objects containing the fields
+	 * @param array $fields The fields to be extracted
+	 * @param string|null $key Optionally, the field to serve as the array key
+	 * @return array|object
+	 */
+	public static function columns($objects, $fields, $key = '') {
+		if (is_object($objects))
+			return (object)array_intersect_key((array)$objects, array_flip($fields));
+		$array = [];
+		$i = 0;
+		foreach ($objects as $object)
+			$array[$key ? $object->$key : $i++] = (object)array_intersect_key((array)$object, array_flip($fields));
+		return $array;
 	}
 
 
