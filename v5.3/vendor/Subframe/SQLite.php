@@ -17,10 +17,10 @@ class SQLite
 	}
 
 	function connect() {
-		if (!$this->sqlite2 && !$this->sqlite3 && function_exists("sqlite_open"))
+		if (!$this->sqlite2 && !$this->sqlite3 && function_exists('sqlite_open'))
 			$this->sqlite2 = @sqlite_open($this->dbname);
-		if (!$this->sqlite2 && !$this->sqlite3 && class_exists("SQLite3"))
-			$this->sqlite3 = new SQLite3 ($this->dbname);
+		if (!$this->sqlite2 && !$this->sqlite3 && class_exists('\SQLite3', false))
+			$this->sqlite3 = new \SQLite3 ($this->dbname);
 		//if ($this->sqlite3 && !@$this->sqlite3->query ("SELECT * FROM sqlite_master"))
 		//	$this->sqlite3 = false;
 		if ($this->sqlite3)
@@ -150,9 +150,11 @@ class SQLite
 	}
 
 	function escape($s) {
+		if (is_array($s))
+			return array_map(array($this, 'escape'), $s);
 		if (!$this->sqlite2 && !$this->sqlite3)
 			$this->connect();
-		return ($this->sqlite2 ? sqlite_escape_string($s) : SQLite3::escapeString($s));
+		return ($this->sqlite2 ? sqlite_escape_string($s) : \SQLite3::escapeString($s));
 	}
 
 	function error() {

@@ -8,7 +8,7 @@ namespace Subframe;
 
 class Model
 {
-	const PREFIX = "", TABLE = "", KEY = "";
+	const PREFIX = "", TABLE = "", KEY = "", ORDER = "";
 
 	static $db, $cache;
 
@@ -91,7 +91,7 @@ class Model
 
 	static function getAll($limit = 0, $page = 0) {
 		$limit = ($limit ? " LIMIT ".($page ? ($page * $limit).", " : "") . +$limit : "");
-		return self::$db->fetch_all_objects("SELECT * FROM ".static::PREFIX.static::TABLE." ORDER BY ".static::KEY." DESC" . $limit, get_called_class());
+		return self::$db->fetch_all_objects("SELECT * FROM ".static::PREFIX.static::TABLE." ORDER BY ".(static::ORDER ? static::ORDER : static::KEY) . $limit, get_called_class());
 	}
 
 	function insert() {
