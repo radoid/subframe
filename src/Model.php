@@ -198,6 +198,18 @@ class Model {
 	}
 
 	/**
+	 * Updates only selected columns, as given by the data array/object, in the DB record(s) identified by the ID(s)
+	 * @param string|string[] $id
+	 * @param array|object $data
+	 * @return int The number of affected rows
+	 */
+	public static function set($id, $data) {
+		if (is_array($id) && !$id)
+			return 0;
+		return (new static($data))->update($id);
+	}
+
+	/**
 	 * Deletes DB record(s) identified by the ID(s)
 	 * @param string|string[] $id
 	 * @return int The number of rows affected
