@@ -25,7 +25,7 @@ class Cache {
 	 * @param string $directory Filesystem directory for storage
 	 * @param int $lifetime Default lifetime in seconds
 	 */
-	public function __construct($directory, $lifetime = 86400) {
+	public function __construct(string $directory, int $lifetime = 86400) {
 		$this->directory = rtrim($directory, '/') . '/';
 		$this->defaultLifetime = $lifetime;
 	}
@@ -37,7 +37,7 @@ class Cache {
 	 * @param int|null $lifetime Duration in seconds, or default time will be used
 	 * @return bool true on success or false on failure
 	 */
-	public function set($name, $content, $lifetime = null) {
+	public function set(string $name, string $content, int $lifetime = null): bool {
 		$path = $this->directory.$name;
 		$isDone = file_put_contents($path, $content, LOCK_EX);
 		if ($isDone)
@@ -50,7 +50,7 @@ class Cache {
 	 * @param string $name The filename
 	 * @return string|null The content on success or null on failure or expiry
 	 */
-	public function get($name) {
+	public function get(string $name) {
 		if (@filemtime($path = $this->directory.$name) >= time())
 			$content = file_get_contents($path);
 		return isset($content) ? $content : null;
@@ -61,7 +61,7 @@ class Cache {
 	 * @param string $prefix The prefix of the item's name; empty string will catch all items
 	 * @return bool true on success or false on failure
 	 */
-	public function delete($prefix) {
+	public function delete(string $prefix): bool {
 		foreach (scandir($this->directory) as $filename)
 			if (is_file($this->directory . $filename))
 				if (strpos($filename, $prefix) === 0 || @filemtime($this->directory . $filename) < time())
@@ -74,7 +74,7 @@ class Cache {
 	 * Deletes all expired items
 	 * @return bool true on success or false on failure
 	 */
-	public function prune() {
+	public function prune(): bool {
 		return $this->delete(':');
 	}
 

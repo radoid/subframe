@@ -5,7 +5,7 @@ use Exception;
 use ReflectionClass;
 
 /**
- * Base MVC controller implementation
+ * Implements the routing and MVC controller mechanisms
  * @package Subframe PHP Framework
  */
 class Controller {
@@ -17,7 +17,7 @@ class Controller {
 	 * @param int $__status The optional HTTP status code
 	 * @throws Exception
 	 */
-	protected function view($__filename, array $__data = [], $__status = 200) {
+	protected function view(string $__filename, array $__data = [], int $__status = 200) {
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE & ~E_WARNING);
 
 		http_response_code($__status);
@@ -32,7 +32,7 @@ class Controller {
 	 * @param array $data The data to output
 	 * @param int $status Optional HTTP status code
 	 */
-	protected function json(array $data = [], $status = 200) {
+	protected function json(array $data = [], int $status = 200) {
 		$json = json_encode((object)$data);
 		http_response_code($status);
 		header('Content-Type: application/json');
@@ -62,7 +62,7 @@ class Controller {
 	 * @param string $url The URL to go to
 	 * @param int $code HTTP status code, such as 301; defaults to 302
 	 */
-	protected function redirect($url, $code = 302) {
+	protected function redirect(string $url, int $code = 302) {
 		http_response_code($code);
 		header('Location: ' . str_replace("\n", "\0", $url));
 		exit;
@@ -77,7 +77,7 @@ class Controller {
 	 * @param string $requestMethod Optional request method (if not $_SERVER['REQUEST_METHOD'])
 	 * @param string $requestPath Optional request path (if not $_SERVER['REQUEST_URI'])
 	 */
-	public static function route($method, $path, $callable, array $classArgs = [], $requestMethod = '', $requestPath = '') {
+	public static function route(string $method, string $path, callable $callable, array $classArgs = [], string $requestMethod = '', string $requestPath = '') {
 		$requestMethod = ($requestMethod ?: $_SERVER['REQUEST_METHOD']);
 		$requestPath = '/' . trim($requestPath !== '' ? $requestPath : self::getGlobalRequestUri(), '/');
 		$path = '/' . trim($path, '/');
@@ -99,7 +99,7 @@ class Controller {
 	 * @param string $requestMethod Optional request method (if not $_SERVER['REQUEST_METHOD'])
 	 * @param string $requestPath Optional request path (if not $_SERVER['REQUEST_URI'])
 	 */
-	public static function routeInNamespace($namespace = '', array $classArgs = [], $requestMethod = '', $requestPath = '') {
+	public static function routeInNamespace(string $namespace = '', array $classArgs = [], string $requestMethod = '', string $requestPath = '') {
 		$requestMethod = $requestMethod ?: $_SERVER['REQUEST_METHOD'] ?: 'GET';
 		$requestPath = '/' . trim($requestPath !== '' ? $requestPath : self::getGlobalRequestUri(), '/');
 
@@ -147,7 +147,7 @@ class Controller {
 	 * @param string[] $args The request's arguments
 	 * @return string[]|null The action (function) name
 	 */
-	public static function findRouteInClass($classname, $method, $args) {
+	public static function findRouteInClass(string $classname, string $method, array $args) {
 		$method = strtolower($method);
 		$count = count($args);
 
@@ -188,7 +188,7 @@ class Controller {
 	 * Sets the ETag header and triggers the 304 response if it matches to the requested ETag
 	 * @param string $etag The ETag value
 	 */
-	protected static function setETag($etag) {
+	protected static function setETag(string $etag) {
 		if (($before = $_SERVER['HTTP_IF_NONE_MATCH'] ?? ''))
 			if ($before == $etag) {
 				header_remove();
@@ -203,7 +203,7 @@ class Controller {
 	 * Sets the Last-Modified header and triggers the 304 response if timestamp not newer then requested
 	 * @param int $timestamp The Unix timestamp
 	 */
-	protected static function setLastModified($timestamp) {
+	protected static function setLastModified(int $timestamp) {
 		if (($before = $_SERVER['HTTP_IF_MODIFIED_SINCE']))
 			if (strtotime($before) >= $timestamp) {
 				header_remove();
@@ -219,7 +219,7 @@ class Controller {
 	 * @param string $arg The argument
 	 * @return string The result
 	 */
-	private static function classCase($arg) {
+	private static function classCase(string $arg): string {
 		if (strpbrk($arg, '-.'))
 			return strtr(ucwords($arg, '-.'), ['-' => '', '.' => '']);
 		return ucfirst($arg);
@@ -231,7 +231,7 @@ class Controller {
 	 * @param string $arg The argument
 	 * @return string The result
 	 */
-	private static function actionCase($method, $arg) {
+	private static function actionCase(string $method, string $arg): string {
 		if (strpbrk($arg, '-.'))
 			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
 		return ($method ? $method.ucfirst($arg) : $arg);
@@ -241,7 +241,7 @@ class Controller {
 	 * Obtains the current request URI
 	 * @return string
 	 */
-	private static function getGlobalRequestUri() {
+	private static function getGlobalRequestUri(): string {
 		$path = (isset($_SERVER['REDIRECT_URL']) ? $_SERVER['REDIRECT_URL'] : rawurldecode(strtok($_SERVER['REQUEST_URI'], '?')));
 
 		return $path;

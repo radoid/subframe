@@ -46,7 +46,7 @@ class Model {
 	 * (only fields that are part of the model are taken)
 	 * @param array|null $data associative array with initial data
 	 */
-	public function __construct($data = null) {
+	public function __construct(array $data = null) {
 		foreach ($this as $key => $value)
 			if (isset($data[$key]))
 				$this->$key = $data[$key];
@@ -87,7 +87,7 @@ class Model {
 	 * Represents the object with a string, suitably for use in SQL queries
 	 * @return string The SQL compatible string
 	 */
-	public function __toString () {
+	public function __toString(): string {
 		$sql = "";
 		foreach ($this as $column => $value)
 			if (isset($this->$column))
@@ -99,7 +99,7 @@ class Model {
 	 * The fields present in the record, as a string suitable for use in SQL queries
 	 * @return string
 	 */
-	public function keys() {
+	public function keys(): string {
 		$keys = "";
 		foreach ($this as $key => $value)
 			if (isset($value))
@@ -111,7 +111,7 @@ class Model {
 	 * The values present in the record, quoted, as a string suitable for use in SQL queries
 	 * @return string
 	 */
-	public function values() {
+	public function values(): string {
 		$values = "";
 		foreach ($this as $key => $value)
 			if (isset($value))
@@ -126,7 +126,7 @@ class Model {
 	 * @param string|null $key Optionally, the field to serve as the array key
 	 * @return array
 	 */
-	public static function column($objects, $field, $key = '') {
+	public static function column(array $objects, string $field, string $key = null): array {
 		$array = [];
 		$i = 0;
 		foreach ($objects as $object)
@@ -141,7 +141,7 @@ class Model {
 	 * @param string|null $key Optionally, the field to serve as the array key
 	 * @return array|object
 	 */
-	public static function columns($objects, $fields, $key = '') {
+	public static function columns($objects, array $fields, string $key = null) {
 		if (is_object($objects))
 			return (object)array_intersect_key((array)$objects, array_flip($fields));
 		$array = [];
@@ -158,7 +158,7 @@ class Model {
 	 * Inserts the object into the DB table
 	 * @return string The insert ID
 	 */
-	public function insert() {
+	public function insert(): string {
 		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
 		self::$pdo->exec($sql);
 		return self::$pdo->lastInsertId();
@@ -168,7 +168,7 @@ class Model {
 	 * Inserts the object into the DB table, updating the existing record if there's a duplicate key
 	 * @return int The number of rows affected
 	 */
-	public function upsert() {
+	public function upsert(): int {
 		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
 				ON DUPLICATE KEY UPDATE $this";
 		return self::$pdo->exec($sql);
@@ -178,7 +178,7 @@ class Model {
 	 * Inserts the object into the DB table, fully replacing the existing record if there's a duplicate key
 	 * @return int The number of rows affected
 	 */
-	public function replace() {
+	public function replace(): int {
 		$sql = "REPLACE INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
 		return self::$pdo->exec($sql);
 	}
@@ -188,7 +188,7 @@ class Model {
 	 * @param string|string[]|null $id Optional value looked up in the key column
 	 * @return int The number of rows affected
 	 */
-	public function update($id = null) {
+	public function update($id = null): int {
 		$id = (isset($id) ? $id : $this->{static::KEY});
 		$sql = strval($this);
 		if ((is_array($id) && !$id) || !$sql)
@@ -203,7 +203,7 @@ class Model {
 	 * @param array|object $data
 	 * @return int The number of affected rows
 	 */
-	public static function set($id, $data) {
+	public static function set($id, $data): int {
 		if (is_array($id) && !$id)
 			return 0;
 		return (new static($data))->update($id);
@@ -214,7 +214,7 @@ class Model {
 	 * @param string|string[] $id
 	 * @return int The number of rows affected
 	 */
-	public static function delete($id) {
+	public static function delete($id): int {
 		if (is_array($id) && !$id)
 			return 0;
 		$sql = "DELETE FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
@@ -226,7 +226,7 @@ class Model {
 	 * @param string|string[] $id ID(s) to look for
 	 * @return boolean
 	 */
-	public static function exists($id) {
+	public static function exists($id): bool {
 		$sql = "SELECT 1 FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).") LIMIT 1";
 		return self::result($sql);
 	}
@@ -252,7 +252,7 @@ class Model {
 	 * @param int $page
 	 * @return static[]|null
 	 */
-	public static function getAll($limit = 0, $after_id = 0, $page = 0) {
+	public static function getAll(int $limit = 0, string $after_id = null, int $page = 0): array {
 		$sql = "SELECT * FROM ".static::TABLE
 				.($after_id ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
 				." ORDER BY ".static::KEY.($limit >= 0 ? " ASC":" DESC")
@@ -266,7 +266,7 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return static|null The record or null
 	 */
-	public static function fetch($q, $params = null) {
+	public static function fetch($q, array $params = null) {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchObject(static::class != 'Subframe\Model' ? static::class : 'stdClass');
@@ -279,7 +279,7 @@ class Model {
 	 * @param string $keyColumn Optional column to serve as the resulting array key
 	 * @return static[] The records
 	 */
-	public static function fetchAll($q, $params = null, $keyColumn = '') {
+	public static function fetchAll($q, array $params = null, string $keyColumn = null): array {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$class = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
@@ -295,7 +295,7 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string|null
 	 */
-	public static function result($q, $params = null) {
+	public static function result($q, array $params = null) {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
@@ -308,7 +308,7 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string[]
 	 */
-	public static function allResults($q, $params = null) {
+	public static function allResults($q, array $params = null): array {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchAll(PDO::FETCH_COLUMN);
@@ -320,7 +320,7 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return PDOStatement
 	 */
-	public static function query($sql, $params = null) {
+	public static function query(string $sql, array $params = null): PDOStatement {
 		if ($params) {
 			$stmt = self::$pdo->prepare($sql);
 			$stmt->execute($params);
@@ -334,7 +334,7 @@ class Model {
 	 * @param string|string[] $str
 	 * @return string
 	 */
-	public static function quote($str) {
+	public static function quote($str): string {
 		if (is_array($str))
 			return implode(',', array_map([self::class, 'quote'], $str));
 		if (!self::$pdo)
@@ -349,7 +349,7 @@ class Model {
 	 * @param string $password [optional]
 	 * @param array $options [optional] Additional PDO options
 	 */
-	public static function connect($dsn, $username = '', $password = '', $options = []) {
+	public static function connect(string $dsn, string $username = null, string $password = null, array $options = []) {
 		self::$pdo = new PDO($dsn, $username, $password, $options + [
 				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 				PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC

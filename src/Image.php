@@ -24,7 +24,7 @@ class Image {
 	 * @param string $source Image file path
 	 * @throws Exception
 	 */
-	public function __construct($source) {
+	public function __construct(string $source) {
 		if (!extension_loaded('gd'))
 			throw new Exception('GD PHP extension is required.', 500);
 		if (!is_readable($source))
@@ -54,15 +54,15 @@ class Image {
 			throw new Exception("Cannot create image from $source.", 500);
 	}
 
-	public function getWidth() {
+	public function getWidth(): int {
 		return imagesx($this->image);
 	}
 
-	public function getHeight() {
+	public function getHeight(): int {
 		return imagesy($this->image);
 	}
 
-	public function isModified() {
+	public function isModified(): bool {
 		return $this->isModified;
 	}
 
@@ -77,11 +77,11 @@ class Image {
 	 * @return Image
 	 * @throws Exception
 	 */
-	public function resample($destWidth, $destHeight, $srcX = null, $srcY = null, $srcWidth = null,  $srcHeight = null) {
+	public function resample(int $destWidth, int $destHeight, int $srcX = null, int $srcY = null, int $srcWidth = null, int $srcHeight = null): self {
 		$dest = imagecreatetruecolor($destWidth, $destHeight);
 		if (!$dest)
 			throw new Exception('Cannot create new image.', 500);
-		if (!imagecopyresampled($dest, $this->image, 0, 0, $srcX ?: 0, $srcY ?: 0, $destWidth, $destHeight, $srcWidth ?: $this->width, $srcHeight ?: $this->height))
+		if (!imagecopyresampled($dest, $this->image, 0, 0, $srcX ?? 0, $srcY ?? 0, $destWidth, $destHeight, $srcWidth ?? $this->width, $srcHeight ?? $this->height))
 			throw new Exception('Cannot resample the image.', 500);
 		$this->image = $dest;
 		$this->isModified = true;
@@ -94,7 +94,7 @@ class Image {
 	 * @param float $angle Rotation angle in degrees, anti-clockwise
 	 * @throws Exception
 	 */
-	public function rotate($angle) {
+	public function rotate(float $angle): self {
 		$this->image = imagerotate($this->image, $angle, 0);
 		if (!$this->image)
 			throw new Exception('Cannot rotate image.', 500);
@@ -110,7 +110,7 @@ class Image {
 	 * @param bool $canEnlarge
 	 * @return Image
 	 */
-	public function contain($maxWidth, $maxHeight, $canEnlarge = false) {
+	public function contain(int $maxWidth, int $maxHeight, bool $canEnlarge = false): self {
 		$width  = imagesx($this->image);
 		$height = imagesy($this->image);
 		if ($canEnlarge || $width > $maxWidth || $height > $maxHeight) {
@@ -132,7 +132,7 @@ class Image {
 	 * @param bool $canEnlarge
 	 * @return Image
 	 */
-	public function cover($maxWidth, $maxHeight, $canEnlarge = true) {
+	public function cover(int $maxWidth, int $maxHeight, bool $canEnlarge = true): self {
 		$width  = imagesx($this->image);
 		$height = imagesy($this->image);
 		if ($canEnlarge || $width > $maxWidth || $height > $maxHeight) {
@@ -155,7 +155,7 @@ class Image {
 	 * @param int $jpegQuality quality value from 0 (worst) to 100 (best)
 	 * @throws Exception
 	 */
-	public function save($destination, $destinationType = IMAGETYPE_JPEG, $jpegQuality = 98) {
+	public function save(string $destination, int $destinationType = IMAGETYPE_JPEG, int $jpegQuality = 98): self {
 		if ($destinationType == IMAGETYPE_GIF)
 			$isSuccess = @imagegif($this->image, $destination);
 		elseif ($destinationType == IMAGETYPE_PNG)
