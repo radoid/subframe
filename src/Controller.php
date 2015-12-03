@@ -3,6 +3,7 @@ namespace Subframe;
 
 use Exception;
 use ReflectionClass;
+use Throwable;
 
 /**
  * Implements the routing and MVC controller mechanisms
@@ -25,6 +26,31 @@ class Controller {
 		require "$__filename.php";
 
 		error_reporting($error_reporting);
+	}
+
+	/**
+	 * Renders a view/template into a string, using given data
+	 * @param string $__filename The filename of the view, without ".php" extension
+	 * @param array $__data The data
+	 */
+	public static function getView(string $filename, array $data = []): string {
+		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE & ~E_WARNING);
+		ob_start();
+
+		try {
+			(function ($__filename, $__data) {
+				extract($__data);
+				require "$__filename.php";
+			})($filename, $data);
+		} catch (Throwable $exception) {}
+
+		$output = ob_get_clean();
+		error_reporting($error_reporting);
+
+		if (isset($exception))
+			throw $exception;
+		
+		return $output;
 	}
 
 	/**
