@@ -31,6 +31,13 @@ class Cache {
 	}
 
 	/**
+	 * Returns the default items' duration in seconds
+	 */
+	public function getLifetime(): int {
+		return $this->defaultLifetime;
+	}
+
+	/**
 	 * Stores the item under the filename
 	 * @param string $name
 	 * @param string $content
@@ -53,7 +60,29 @@ class Cache {
 	public function get(string $name) {
 		if (@filemtime($path = $this->directory.$name) >= time())
 			$content = file_get_contents($path);
-		return isset($content) ? $content : null;
+		return $content ?? null;
+	}
+
+	/**
+	 * Checks whether an item exists in the cache and is still valid
+	 * @param string $name The file name of the item
+	 * @return bool
+	 */
+	public function has(string $name): bool {
+		$mtime = @filemtime($this->directory.$name);
+		
+		return ($mtime > time());
+	}
+
+	/**
+	 * Returns the item's expiry time (Unix timestamp)
+	 * @param string $name
+	 * @return int|null Timestamp or null on failure
+	 */
+	public function getExpiryTime(string $name) {
+		$mtime = @filemtime($this->directory.$name);
+
+		return $mtime ?? null;
 	}
 
 	/**
@@ -77,5 +106,4 @@ class Cache {
 	public function prune(): bool {
 		return $this->delete(':');
 	}
-
 }
