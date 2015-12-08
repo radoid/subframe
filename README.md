@@ -1,8 +1,8 @@
 
 [Subframe PHP framework](http://radoid.com/subframe/)
-======================
+=====================================================
 
-Light and lightning fast PHP framework, intended for small and medium-sized websites built according to MVC and REST principles.
+Light and lightning fast PHP framework, intended for small and medium-sized websites, built according to MVC and REST principles.
 Its main objectives are maximum performance (through minimum server load and plentiful caching) and powerful but minimalistic elegance.
 
 The framework is still under construction. MIT licence.
@@ -30,29 +30,30 @@ The suggested folder structure for the website is as follows:
 	vendor
 		Subframe
 
-Framework classes are kept in `vendor/Subframe` folder under namespace `Subframe`, according to the PSR-0.
-Other frameworks also belong in the `vendor` folder,
-and project-specific classes should be kept in `application/libraries` folder, so they can be loaded automatically.
+Framework classes are kept in `vendor/Subframe` folder, under namespace `Subframe`.
+Other frameworks also belong in the same `vendor` folder,
+and project-specific classes are suggested to be kept in `application/libraries` folder, and also be loaded automatically.
 
-The framework requires the user to implement autoloading function in the main `index.php` (the "front controller").
-A minimal example is included. The simplest `index.php` (for the folder structure suggested above) could be as follows:
+The framework requires the developer to hand-craft the class-loading `__autoload()` function in the main `index.php` file,
+which is intended to be read as a configuration set.
+
+A minimal example is included. The simplest `index.php` (for the folder structure as suggested above) could be as follows:
 
 	<?php
-	define ('ROOT', $_SERVER['DOCUMENT_ROOT']);
-	define ('HOME', rtrim(dirname($_SERVER['SCRIPT_NAME']), '/').'/');
+	define ('ROOT', rtrim($_SERVER['DOCUMENT_ROOT'], '/').'/');
 
-	// Auto-loading mechanism written as a sort of a configuration set
+	// Auto-loading mechanism written as a kind of a configuration set
 	function __autoload($classname) {
-		(@include ROOT.HOME."../application/models/$classname.php")
-			or (@include ROOT.HOME."../application/libraries/$classname.php")
-				or (@include ROOT.HOME."../vendor/" . str_replace('\\', '/', "$classname.php"))
-					or trigger_error("Class $classname not found", E_USER_ERROR);
+		(@include ROOT."../application/models/$classname.php")
+		or (@include ROOT."../application/libraries/$classname.php")
+		or (@include ROOT."../vendor/" . str_replace('\\', '/', "$classname.php"))
+		or trigger_error("Class $classname not found", E_USER_ERROR);
 	}
 
 	// Finding a controller and an action appropriate for the URI
 	Subframe\Controller::action(null, null,
-			ROOT.HOME.'../application/controllers/',
-			ROOT.HOME.'../application/views/');
+			ROOT.'../application/controllers/',
+			ROOT.'../application/views/');
 
 	// If no appropriate action was found, it's a "404 Not Found" situation
 	header('HTTP/1.1 404 Not Found');
