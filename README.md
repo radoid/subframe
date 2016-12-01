@@ -10,7 +10,7 @@ The framework is still under construction. MIT licence.
 Requirements
 ------------
 
-PHP version 7.0
+PHP version 7.1
 
 Getting Started
 ---------------
