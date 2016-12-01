@@ -18,7 +18,7 @@ class Controller {
 	 * @param int $__status The optional HTTP status code
 	 * @throws Exception
 	 */
-	protected function view(string $__filename, array $__data = [], int $__status = 200) {
+	protected function view(string $__filename, array $__data = [], int $__status = 200): void {
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE & ~E_WARNING);
 
 		http_response_code($__status);
@@ -30,8 +30,9 @@ class Controller {
 
 	/**
 	 * Renders a view/template into a string, using given data
-	 * @param string $__filename The filename of the view, without ".php" extension
-	 * @param array $__data The data
+	 * @param string $filename The filename of the view, without ".php" extension
+	 * @param array $data The data
+	 * @throws Throwable
 	 */
 	public static function getView(string $filename, array $data = []): string {
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE & ~E_WARNING);
@@ -58,7 +59,7 @@ class Controller {
 	 * @param array $data The data to output
 	 * @param int $status Optional HTTP status code
 	 */
-	protected function json(array $data = [], int $status = 200) {
+	protected function json(array $data = [], int $status = 200): void {
 		$json = json_encode((object)$data);
 		http_response_code($status);
 		header('Content-Type: application/json');
@@ -68,8 +69,6 @@ class Controller {
 
 	/**
 	 * Flushes the response to the client, e.g. to allow a long processing task to continue
-	 * @param string $url The URL to go to
-	 * @param int $code HTTP status code, such as 301; defaults to 302
 	 */
 	protected function finish() {
 		while (ob_get_level())
@@ -88,7 +87,7 @@ class Controller {
 	 * @param string $url The URL to go to
 	 * @param int $code HTTP status code, such as 301; defaults to 302
 	 */
-	protected function redirect(string $url, int $code = 302) {
+	protected function redirect(string $url, int $code = 302): void {
 		http_response_code($code);
 		header('Location: ' . str_replace("\n", "\0", $url));
 		exit;
@@ -130,7 +129,7 @@ class Controller {
 		$requestPath = '/' . trim($requestPath !== '' ? $requestPath : self::getGlobalRequestUri(), '/');
 
 		if (($route = self::findRouteInNamespace($namespace, $requestMethod, $requestPath))) {
-			list($class, $action, $args) = $route;
+			[$class, $action, $args] = $route;
 			$instance = new $class(...$classArgs);
 
 			call_user_func_array([$instance, $action], $args);
@@ -145,7 +144,7 @@ class Controller {
 	 * @param string $requestPath The request's path
 	 * @return array|null
 	 */
-	public static function findRouteInNamespace($namespace, $requestMethod, $requestPath) {
+	private static function findRouteInNamespace(string $namespace, string $requestMethod, string $requestPath): ?array {
 		$requestPath = trim($requestPath, '/');
 		$argv = ($requestPath !== '' ? explode('/', $requestPath) : []);
 		$argc = count($argv);
@@ -173,7 +172,7 @@ class Controller {
 	 * @param string[] $args The request's arguments
 	 * @return string[]|null The action (function) name
 	 */
-	public static function findRouteInClass(string $classname, string $method, array $args) {
+	private static function findRouteInClass(string $classname, string $method, array $args): ?array {
 		$method = strtolower($method);
 		$count = count($args);
 
@@ -268,7 +267,7 @@ class Controller {
 	 * @return string
 	 */
 	private static function getGlobalRequestUri(): string {
-		$path = (isset($_SERVER['REDIRECT_URL']) ? $_SERVER['REDIRECT_URL'] : rawurldecode(strtok($_SERVER['REQUEST_URI'], '?')));
+		$path = ($_SERVER['REDIRECT_URL'] ?? rawurldecode(strtok($_SERVER['REQUEST_URI'], '?')));
 
 		return $path;
 	}

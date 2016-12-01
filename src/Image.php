@@ -36,7 +36,7 @@ class Image {
 		$size = getimagesize($source);
 		if (!$size)
 			throw new Exception("File $source is not an image.", 500);
-		list($this->width, $this->height, $type) = $size;
+		[$this->width, $this->height, $type] = $size;
 		if (!$this->width || !$this->height || !$type)
 			throw new Exception("File $source is not an image.", 500);
 
@@ -77,7 +77,7 @@ class Image {
 	 * @return Image
 	 * @throws Exception
 	 */
-	public function resample(int $destWidth, int $destHeight, int $srcX = null, int $srcY = null, int $srcWidth = null, int $srcHeight = null): self {
+	public function resample(int $destWidth, int $destHeight, ?int $srcX = null, ?int $srcY = null, ?int $srcWidth = null, ?int $srcHeight = null): self {
 		$dest = imagecreatetruecolor($destWidth, $destHeight);
 		if (!$dest)
 			throw new Exception('Cannot create new image.', 500);

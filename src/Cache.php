@@ -44,7 +44,7 @@ class Cache {
 	 * @param int|null $lifetime Duration in seconds, or default time will be used
 	 * @return bool true on success or false on failure
 	 */
-	public function set(string $name, string $content, int $lifetime = null): bool {
+	public function set(string $name, string $content, ?int $lifetime = null): bool {
 		$path = $this->directory.$name;
 		$isDone = file_put_contents($path, $content, LOCK_EX);
 		if ($isDone)
@@ -57,7 +57,7 @@ class Cache {
 	 * @param string $name The filename
 	 * @return string|null The content on success or null on failure or expiry
 	 */
-	public function get(string $name) {
+	public function get(string $name): ?string {
 		if (@filemtime($path = $this->directory.$name) >= time())
 			$content = file_get_contents($path);
 		return $content ?? null;

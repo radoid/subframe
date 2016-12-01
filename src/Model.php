@@ -13,30 +13,30 @@ class Model {
 
 	/**
 	 * Database table name
-	 * @var string
+	 * @var ?string
 	 */
-	const TABLE = '';
+	public const TABLE = null;
 
 	/**
 	 * Key column in the database table
-	 * @var string
+	 * @var ?string
 	 */
-	const KEY = 'id';
+	public const KEY = 'id';
 
 	/**
 	 * Default column used for sorting
-	 * @var string
+	 * @var ?string
 	 */
-	const ORDER = '';
+	public const ORDER = null;
 
 	/** Represents NULL value */
-	const Null = NAN;
+	public const Null = NAN;
 
 	/**
 	 * The database interface
 	 * @var PDO
 	 */
-	static $pdo;
+	private static $pdo;
 
 
 	// Data manipulation
@@ -46,7 +46,7 @@ class Model {
 	 * (only fields that are part of the model are taken)
 	 * @param array|null $data associative array with initial data
 	 */
-	public function __construct(array $data = null) {
+	public function __construct(?array $data = null) {
 		foreach ($this as $key => $value)
 			if (isset($data[$key]))
 				$this->$key = $data[$key];
@@ -126,7 +126,7 @@ class Model {
 	 * @param string|null $key Optionally, the field to serve as the array key
 	 * @return array
 	 */
-	public static function column(array $objects, string $field, string $key = null): array {
+	public static function column(array $objects, string $field, ?string $key = null): array {
 		$array = [];
 		$i = 0;
 		foreach ($objects as $object)
@@ -141,7 +141,7 @@ class Model {
 	 * @param string|null $key Optionally, the field to serve as the array key
 	 * @return array|object
 	 */
-	public static function columns($objects, array $fields, string $key = null) {
+	public static function columns($objects, array $fields, ?string $key = null) {
 		if (is_object($objects))
 			return (object)array_intersect_key((array)$objects, array_flip($fields));
 		$array = [];
@@ -189,7 +189,7 @@ class Model {
 	 * @return int The number of rows affected
 	 */
 	public function update($id = null): int {
-		$id = (isset($id) ? $id : $this->{static::KEY});
+		$id = ($id ?? $this->{static::KEY});
 		$sql = strval($this);
 		if ((is_array($id) && !$id) || !$sql)
 			return 0;
@@ -250,12 +250,12 @@ class Model {
 	 * @param int $limit Optionally, maximum number of records
 	 * @param string|null $after_id Optionally, the last ID from the previous request
 	 * @param int $page
-	 * @return static[]|null
+	 * @return static[]
 	 */
-	public static function getAll(int $limit = 0, string $after_id = null, int $page = 0): array {
+	public static function getAll(int $limit = 0, ?string $after_id = null, int $page = 0): array {
 		$sql = "SELECT * FROM ".static::TABLE
-				.($after_id ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
-				." ORDER BY ".static::KEY.($limit >= 0 ? " ASC":" DESC")
+				.(isset($after_id) ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
+				." ORDER BY ".(static::ORDER ?? static::KEY).($limit >= 0 ? " ASC":" DESC")
 				.($limit ? " LIMIT ".($page ? abs($page*$limit).',':'') . abs($limit) : "");
 		return static::fetchAll($sql);
 	}
@@ -266,23 +266,23 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return static|null The record or null
 	 */
-	public static function fetch($q, array $params = null) {
+	public static function fetch($q, ?array $params = null) {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
-		return $q->fetchObject(static::class != 'Subframe\Model' ? static::class : 'stdClass');
+		return $q->fetchObject(static::class != 'Subframe/Model' ? static::class : 'stdClass') ?: null;
 	}
 
 	/**
-	 * Fetches records by direct SQL query, optionally with keys from a column
+	 * Fetches records by direct SQL query, optionally indexed by a column
 	 * @param PDOStatement|string $q The query as an SQL string or PDOStatement
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
-	 * @param string $keyColumn Optional column to serve as the resulting array key
+	 * @param string|null $keyColumn
 	 * @return static[] The records
 	 */
-	public static function fetchAll($q, array $params = null, string $keyColumn = null): array {
+	public static function fetchAll($q, ?array $params = null, ?string $keyColumn = null): array {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
-		$class = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
+		$class = (static::class != 'Subframe\\Model' ? static::class : 'stdClass');
 		if (!$keyColumn)
 			return $q->fetchAll(PDO::FETCH_CLASS, $class);
 		for ($objects = []; ($o = $q->fetchObject($class)); $objects[$o->$keyColumn] = $o) {}
@@ -295,7 +295,7 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string|null
 	 */
-	public static function result($q, array $params = null) {
+	public static function result($q, ?array $params = null): ?string {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
@@ -308,7 +308,7 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string[]
 	 */
-	public static function allResults($q, array $params = null): array {
+	public static function allResults($q, ?array $params = null): array {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchAll(PDO::FETCH_COLUMN);
@@ -320,7 +320,7 @@ class Model {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return PDOStatement
 	 */
-	public static function query(string $sql, array $params = null): PDOStatement {
+	public static function query(string $sql, ?array $params = null): PDOStatement {
 		if ($params) {
 			$stmt = self::$pdo->prepare($sql);
 			$stmt->execute($params);
@@ -338,18 +338,18 @@ class Model {
 		if (is_array($str))
 			return implode(',', array_map([self::class, 'quote'], $str));
 		if (!self::$pdo)
-			return "'".addslashes($str)."'";
-		return self::$pdo->quote($str);
+			return "'".addslashes($str ?? '')."'";
+		return self::$pdo->quote($str ?? '');
 	}
 
 	/**
 	 * Sets up the PDO object representing the database connection
 	 * @param string $dsn The DNS describing the database
-	 * @param string $username [optional]
-	 * @param string $password [optional]
+	 * @param string|null $username [optional]
+	 * @param string|null $password [optional]
 	 * @param array $options [optional] Additional PDO options
 	 */
-	public static function connect(string $dsn, string $username = null, string $password = null, array $options = []) {
+	public static function connect(string $dsn, ?string $username = null, ?string $password = null, array $options = []): void {
 		self::$pdo = new PDO($dsn, $username, $password, $options + [
 				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 				PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
