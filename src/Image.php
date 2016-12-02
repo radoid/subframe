@@ -15,6 +15,9 @@ class Image {
 	/** @var int */
 	private $width, $height;
 
+	/** @var array|null */
+	private $exif = null;
+
 	/** @var bool */
 	private $isModified = false;
 
@@ -40,18 +43,28 @@ class Image {
 		if (!$this->width || !$this->height || !$type)
 			throw new Exception("File $source is not an image.", 500);
 
+		if (function_exists('exif_read_data'))
+			$this->exif = @exif_read_data($source) ?: null;
+
 		if ($type == IMAGETYPE_GIF)
 			$this->image = imagecreatefromgif($source);
 		elseif ($type == IMAGETYPE_PNG)
 			$this->image = imagecreatefrompng($source);
 		elseif ($type == IMAGETYPE_BMP || $type == IMAGETYPE_WBMP)
 			$this->image = imagecreatefromwbmp($source);
+		elseif ($type == IMAGETYPE_WEBP)
+			$this->image = imagecreatefromwebp($source);
 		elseif ($type == IMAGETYPE_JPEG || $type == IMAGETYPE_JPEG2000)
 			$this->image = imagecreatefromjpeg($source);
 		else
 			throw new Exception("Unsupported image format in $source.", 500);
 		if (!$this->image)
 			throw new Exception("Cannot create image from $source.", 500);
+
+		$orientation = $this->exif['Orientation'] ?? null;
+		$angle = ($orientation == 8 ? +90 : ($orientation == 3 ? +180 : ($orientation == 6 ? -90 : 0)));
+		if ($angle)
+			$this->rotate($angle);
 	}
 
 	public function getWidth(): int {
@@ -60,6 +73,10 @@ class Image {
 
 	public function getHeight(): int {
 		return imagesy($this->image);
+	}
+
+	public function getExifData(string $key) {
+		return $this->exif[$key] ?? null;
 	}
 
 	public function isModified(): bool {
