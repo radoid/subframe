@@ -38,6 +38,12 @@ class Model {
 	 */
 	private static $pdo;
 
+	/**
+	 * Current transaction level
+	 * @var int
+	 */
+	private static $transactionLevel = 0;
+
 
 	// Data manipulation
 
@@ -366,6 +372,23 @@ class Model {
 		if (!self::$pdo)
 			return "'".addslashes($str ?? '')."'";
 		return self::$pdo->quote($str ?? '');
+	}
+
+	/**
+	 * Starts a new transaction
+	 */
+	public static function begin() {
+		if (self::$transactionLevel++ == 0)
+			self::$pdo->beginTransaction();
+	}
+
+	/**
+	 * Commits the current transaction
+	 */
+	public static function commit() {
+		if (self::$transactionLevel == 1)
+			self::$pdo->commit();
+		self::$transactionLevel = max(0, self::$transactionLevel - 1);
 	}
 
 	/**
