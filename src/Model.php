@@ -222,6 +222,16 @@ class Model {
 	}
 
 	/**
+	 * Returns the total record count in the table
+	 * @return int
+	 */
+	public static function count(): int {
+		$sql = "SELECT COUNT(*) FROM ".static::TABLE;
+		$count = self::result($sql);
+		return $count;
+	}
+
+	/**
 	 * Tells whether any records exist having given ID(s)
 	 * @param string|string[] $id ID(s) to look for
 	 * @return boolean
@@ -327,6 +337,22 @@ class Model {
 		} else
 			$stmt = self::$pdo->query($sql);
 		return $stmt;
+	}
+
+	/**
+	 * Executes an SQL query that returns no results
+	 * @param string $sql The query
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
+	 * @return int The number of rows affected
+	 */
+	public static function exec(string $sql, ?array $params = null): int {
+		if ($params) {
+			$stmt = self::$pdo->prepare($sql);
+			$stmt->execute($params);
+			$affected = $stmt->rowCount();
+		} else
+			$affected = self::$pdo->exec($sql);
+		return $affected;
 	}
 
 	/**
