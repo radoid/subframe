@@ -1,6 +1,7 @@
 <?php
 namespace Subframe;
 
+use Generator;
 use PDO;
 use PDOStatement;
 
@@ -303,6 +304,24 @@ class Model {
 			return $q->fetchAll(PDO::FETCH_CLASS, $class);
 		for ($objects = []; ($o = $q->fetchObject($class)); $objects[$o->$keyColumn] = $o) {}
 		return $objects;
+	}
+
+	/**
+	 * Fetches records utilizing Generator
+	 * @param string|PDOStatement $q The query as an SQL string or PDOStatement
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
+	 * @param string|null $keyColumn
+	 * @return Generator<array>
+	 */
+	public static function generateAll($q, array $params = null, ?string $keyColumn = null): Generator {
+		if (!$q instanceof PDOStatement)
+			$q = self::query($q, $params);
+		$classname = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
+		while (($o = $q->fetchObject($classname)))
+			if ($keyColumn)
+				yield $o->$keyColumn => $o;
+			else
+				yield $o;
 	}
 
 	/**
