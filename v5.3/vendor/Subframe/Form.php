@@ -117,6 +117,23 @@ class Form
 	}
 
 	/**
+	 * Converts date from ISO format YYYY-MM-DD into format DD.MM.YYYY
+	 * @param string $date date in ISO format
+	 * @return false|string date in format or FALSE if impossible
+	 */
+	static function date2de($date) {
+		if (preg_match('/^(\d+)-(\d+)-(\d+)$/', trim($date), $m) && checkdate($m[2], $m[3], $m[1]))
+			return sprintf("%02d.%02d.%04d", $m[3], $m[2], $m[1]);
+		return false;
+	}
+
+	static function de2date($date) {
+		if (preg_match('/^(\d+)\.(\d+)\.(\d+)?\.?$/', trim($date), $m) && checkdate($m[2], $m[1], $m[3]))
+			return sprintf("%04d-%02d-%02d", (@$m[3] ? ($m[3] < 100 ? 1900+$m[3] : $m[3]) : date("Y")), $m[2], $m[1]);
+		return false;
+	}
+
+	/**
 	 * Converts date from ISO format YYYY-MM-DD into format D.MM.YYYY.
 	 * @param string $date date in ISO format
 	 * @return false|string date in format or FALSE if impossible

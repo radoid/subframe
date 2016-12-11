@@ -51,7 +51,7 @@ class Model
 		$sql = "";
 		foreach ($this as $column => $value)
 			if (isset ($this->$column))
-				$sql = ($sql ? "$sql, " : "")."$column=".(is_double($value) && !is_finite($value) ? "NULL" : "'".(self::$db ? self::$db->escape($value) : $value)."'");
+				$sql = ($sql ? "$sql, " : "")."$column=".(is_double($value) && !is_finite($value) ? "NULL" : "'".(self::$db ? self::$db->escape($value) : addslashes($value))."'");
 		return $sql;
 	}
 
@@ -82,16 +82,20 @@ class Model
 		return false;
 	}
 
+	static function exists($id) {
+		return self::$db->result("SELECT 1 FROM ".static::PREFIX.static::TABLE." WHERE ".static::KEY." IN (".self::$db->quote($id).") LIMIT 1");
+	}
+
 	static function get($id) {
+		$sql = "SELECT * FROM ".static::PREFIX.static::TABLE." WHERE ".static::KEY." IN (".self::$db->quote($id).")";
 		if (is_array($id))
-			return ($id ? self::$db->fetch_all_objects("SELECT * FROM ".static::PREFIX.static::TABLE." WHERE ".static::KEY." IN ('".implode("','", self::$db->escape($id))."')", get_called_class()) : array());
-		else
-			return self::$db->fetch_object("SELECT * FROM ".static::PREFIX.static::TABLE." WHERE ".static::KEY."='".self::$db->escape($id)."'", get_called_class());
+			return self::$db->fetch_all_objects($sql, get_called_class());
+		return self::$db->fetch_object($sql, get_called_class());
 	}
 
 	static function getAll($limit = 0, $page = 0) {
 		$limit = ($limit ? " LIMIT ".($page ? ($page * $limit).", " : "") . +$limit : "");
-		return self::$db->fetch_all_objects("SELECT * FROM ".static::PREFIX.static::TABLE." ORDER BY ".(static::ORDER ? static::ORDER : static::KEY) . $limit, get_called_class());
+		return self::$db->fetch_all_objects("SELECT * FROM ".static::PREFIX.static::TABLE." ORDER BY ".(static::ORDER ? static::ORDER : static::KEY." DESC") . $limit, get_called_class());
 	}
 
 	function insert() {
@@ -106,17 +110,15 @@ class Model
 
 	function update($id = null) {
 		$id = (isset($id) ? $id : $this->{static::KEY});
-		if (is_array($id))
-			return ($id ? self::$db->query("UPDATE ".static::PREFIX.static::TABLE." SET $this WHERE ".static::KEY." IN ('".implode("','", self::$db->escape($id))."')") : true);
-		else
-			return self::$db->query("UPDATE ".static::PREFIX.static::TABLE." SET $this WHERE ".static::KEY."='".self::$db->escape($id)."'");
+		if (is_array($id) && !$id)
+			return true;
+		return self::$db->query("UPDATE ".static::PREFIX.static::TABLE." SET $this WHERE ".static::KEY." IN (".self::$db->quote($id).")");
 	}
 
 	static function delete($id) {
-		if (is_array($id))
-			return ($id ? self::$db->query("DELETE FROM ".static::PREFIX.static::TABLE." WHERE ".static::KEY." IN ('".implode("','", self::$db->escape($id))."')") : true);
-		else
-			return self::$db->query("DELETE FROM ".static::PREFIX.static::TABLE." WHERE ".static::KEY."='".self::$db->escape($id)."'");
+		if (is_array($id) && !$id)
+			return true;
+		return self::$db->query("DELETE FROM ".static::PREFIX.static::TABLE." WHERE ".static::KEY." IN (".self::$db->quote($id).")");
 	}
 
 }

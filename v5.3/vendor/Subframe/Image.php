@@ -33,7 +33,8 @@ class Image
 		if (!$initialwidth || !$initialheight || !$type)
 			return false;
 
-		ini_set("memory_limit", "128M");
+		ini_set('memory_limit', '256M');
+		ini_set('gd.jpeg_ignore_warning', 1);
 
 		if ($type == IMAGETYPE_GIF)
 			$image_before = imagecreatefromgif($source);

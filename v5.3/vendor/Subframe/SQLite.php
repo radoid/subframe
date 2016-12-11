@@ -17,10 +17,10 @@ class SQLite
 	}
 
 	function connect() {
+		if (!$this->sqlite2 && !$this->sqlite3 && class_exists('\SQLite3'))
+			$this->sqlite3 = new \SQLite3 ($this->dbname);
 		if (!$this->sqlite2 && !$this->sqlite3 && function_exists('sqlite_open'))
 			$this->sqlite2 = @sqlite_open($this->dbname);
-		if (!$this->sqlite2 && !$this->sqlite3 && class_exists('\SQLite3', false))
-			$this->sqlite3 = new \SQLite3 ($this->dbname);
 		//if ($this->sqlite3 && !@$this->sqlite3->query ("SELECT * FROM sqlite_master"))
 		//	$this->sqlite3 = false;
 		if ($this->sqlite3)
@@ -56,7 +56,7 @@ class SQLite
 		return false;
 	}
 
-	function fetch_array($q = false) {
+	function fetch_assoc($q = false) {
 		if ($q === false)
 			$q = $this->lastresource;
 		elseif (is_string($q))
@@ -66,7 +66,7 @@ class SQLite
 		return false;
 	}
 
-	function fetch_all_arrays($q = null) {
+	function fetch_all_assoc($q = null) {
 		if ($q === null)
 			$q = $this->lastresource;
 		elseif (is_string($q))
@@ -77,19 +77,22 @@ class SQLite
 		return $arrays;
 	}
 
-	function fetch_object($q = false, $classname = "") {
-		if ($q === false)
+	function fetch_object($q = null, $classname = "") {
+		if ($q === null)
 			$q = $this->lastresource;
 		elseif (is_string($q))
-			$q = $this->query($q);
-		if ($q)
-			return ($this->sqlite2 ? ($classname ? sqlite_fetch_object($q, $classname) : sqlite_fetch_object($q))
-					: (($r = $q->fetchArray(SQLITE3_ASSOC)) ? ($classname ? new $classname ($r) : $r) : false));
+			$q = $this->query($q) and $finalize = true;
+		if (!$q)
 		return false;
+		$o = ($this->sqlite2 ? ($classname ? sqlite_fetch_object($q, $classname) : sqlite_fetch_object($q))
+				: (($r = $q->fetchArray(SQLITE3_ASSOC)) ? ($classname ? new $classname ($r) : (object)$r) : false));
+		if ($q instanceof SQLite3Result && !empty($finalize))
+			$q->finalize();
+		return $o;
 	}
 
-	function fetch_all_objects($q = false, $classname = "", $primary_key = "") {
-		if ($q === false)
+	function fetch_all_objects($q = null, $classname = "", $primary_key = "") {
+		if ($q === null)
 			$q = $this->lastresource;
 		elseif (is_string($q))
 			$q = $this->query($q);
@@ -97,22 +100,27 @@ class SQLite
 			return false;
 		$objects = array();
 		while ($this->sqlite2 ? ($classname && ($o = sqlite_fetch_object($q, $classname)) !== false) || (!$classname && ($o = sqlite_fetch_object($q)) !== false)
-				: ($o = $q->fetchArray(SQLITE3_ASSOC)) && ($classname && ($o = new $classname ($o)) || !$classname))
+				: ($o = $q->fetchArray(SQLITE3_ASSOC)) && ($o = ($classname ? new $classname($o) : (object)$o)))
 			if ($primary_key)
 				$objects[$classname ? $o->$primary_key : $o[$primary_key]] = $o;
 			else
 				$objects[] = $o;
+		if ($q instanceof SQLite3Result)
+			$q->finalize();
 		return $objects;
 	}
 
-	function result($q = false) {
+	function result($q = null) {
 		if ($q === false)
 			$q = $this->lastresource;
 		elseif (is_string($q))
 			$q = $this->query($q);
-		if ($q)
-			return ($this->sqlite2 ? sqlite_fetch_single($q) : (($r = $q->fetchArray(SQLITE3_NUM)) ? $r[0] : false));
+		if (!$q)
 		return false;
+		$r = ($this->sqlite2 ? sqlite_fetch_single($q) : (($r = $q->fetchArray(SQLITE3_NUM)) ? $r[0] : false));
+		if ($q instanceof SQLite3Result)
+			$q->finalize();
+		return $r;
 	}
 
 	function num_rows($q = false) {
@@ -151,10 +159,18 @@ class SQLite
 
 	function escape($s) {
 		if (is_array($s))
-			return array_map(array($this, 'escape'), $s);
+			return array_map([$this, 'escape'], $s);
 		if (!$this->sqlite2 && !$this->sqlite3)
 			$this->connect();
 		return ($this->sqlite2 ? sqlite_escape_string($s) : \SQLite3::escapeString($s));
+	}
+
+	function quote($s) {
+		if (is_array($s))
+			return implode(',', array_map([$this, 'quote'], $s));
+		if (!$this->sqlite2 && !$this->sqlite3)
+			$this->connect();
+		return "'".($this->sqlite2 ? sqlite_escape_string($s) : \SQLite3::escapeString($s))."'";
 	}
 
 	function error() {

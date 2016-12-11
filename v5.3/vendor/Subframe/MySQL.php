@@ -24,7 +24,7 @@ class MySQL
 		if (mysqli_connect_errno())
 			$this->link = null;
 		else
-			$this->link->query("SET NAMES utf8");
+			$this->link->query("SET NAMES utf8mb4");
 		return $this->link;
 	}
 
@@ -38,12 +38,12 @@ class MySQL
 		if ($this->link)
 			if (($result = $this->link->query($sql)))
 				return $result;
-			elseif (defined('DEBUG'))
-				trigger_error('<h3>' . $this->error() . '</h3><pre>' . htmlspecialchars(var_export(debug_backtrace(), true)));  // TODO
+			elseif (defined('DEBUG') && DEBUG)
+				trigger_error('<h3>'.$this->error().'</h3><pre>'.htmlspecialchars(var_export(debug_backtrace(), true)));  // TODO
 		return false;
 	}
 
-	function fetch_array($q) {
+	function fetch_assoc($q) {
 		if (is_string($q))
 			$q = $this->query($q);
 		if ($q instanceof \mysqli_result)
@@ -51,13 +51,13 @@ class MySQL
 		return false;
 	}
 
-	function fetch_all_arrays($q) {
+	function fetch_all_assoc($q) {
 		if (is_string($q))
 			$q = $this->query($q);
 		if (!$q instanceof \mysqli_result)
 			return false;
-		for ($arrays = array(); ($r = $q->fetch_assoc()); $arrays[] = $r) ;
-		return $arrays;
+		for ($rows = []; ($r = $q->fetch_assoc()); $rows[] = $r) ;
+		return $rows;
 	}
 
 	function fetch_row($q) {
@@ -81,7 +81,7 @@ class MySQL
 			$q = $this->query($q);
 		if (!$q instanceof \mysqli_result)
 			return false;
-		$objects = array();
+		$objects = [];
 		while (($o = $q->fetch_object($classname)))
 			if ($primary)
 				$objects[$o->$primary] = $o;
@@ -95,7 +95,7 @@ class MySQL
 			$q = $this->query($q);
 		if ($q instanceof \mysqli_result && ($r = $q->fetch_row()))
 			return $r[0];
-		return false;
+		return ($q === false ? false : null);
 	}
 
 	function all_results($q, $column = '', $primary = '') {
@@ -103,7 +103,7 @@ class MySQL
 			$q = $this->query($q);
 		if (!$q instanceof \mysqli_result)
 			return false;
-		for ($results = array(); ($r = ($column ? $q->fetch_assoc() : $q->fetch_row()));)
+		for ($results = []; ($r = ($column ? $q->fetch_assoc() : $q->fetch_row()));)
 			if ($column && $primary)
 				$results[$r[$primary]] = ($column ? $r[$column] : $r[0]);
 			else
@@ -131,8 +131,14 @@ class MySQL
 		if (!$this->link)
 			$this->connect();
 		if (is_array($s))
-			return ($this->link ? array_map(array($this->link, "real_escape_string"), $s) : addslashes($s));
+			return array_map([$this, 'escape'], $s);
 		return ($this->link ? $this->link->real_escape_string($s) : addslashes($s));
+	}
+
+	function quote($s) {
+		if (is_array($s))
+			return implode(',', array_map([$this, 'quote'], $s));
+		return "'" . $this->escape($s) . "'";
 	}
 
 	function error() {
