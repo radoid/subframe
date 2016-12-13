@@ -123,6 +123,21 @@ class SQLite
 		return $r;
 	}
 
+	function all_results($q = null) {
+		if ($q === false)
+			$q = $this->lastresource;
+		elseif (is_string($q))
+			$q = $this->query($q);
+		if (!$q)
+			return false;
+		$results = array();
+		while ($this->sqlite2 ? is_string($r = sqlite_fetch_single($q))	: (($r = $q->fetchArray(SQLITE3_NUM)) ? ($r = $r[0]) : false))
+			$results[] = $r;
+		if ($q instanceof SQLite3Result)
+			$q->finalize();
+		return $results;
+	}
+
 	function num_rows($q = false) {
 		if ($q === false)
 			$q = $this->lastresource;
