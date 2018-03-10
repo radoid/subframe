@@ -4,13 +4,14 @@ namespace Subframe;
 use Generator;
 use PDO;
 use PDOStatement;
+use stdClass;
 
 /**
  * Implements the data model functionality
  *
  * @package Subframe PHP Framework
  */
-class Model {
+class Model extends stdClass {
 
 	/**
 	 * Database table name
