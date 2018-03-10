@@ -31,6 +31,12 @@ class Model extends stdClass {
 	 */
 	public const ORDER = null;
 
+	/**
+	 * Columns that can't be assigned values via the constructor
+	 * @var ?array
+	 */
+	protected const GUARDED = null;
+
 	/** Represents NULL value */
 	public const Null = NAN;
 
@@ -56,7 +62,7 @@ class Model extends stdClass {
 	 */
 	public function __construct(?array $data = null) {
 		foreach ($this as $key => $value)
-			if (isset($data[$key]))
+			if (isset($data[$key]) && (!static::GUARDED || !in_array($key, static::GUARDED)))
 				$this->$key = $data[$key];
 	}
 
