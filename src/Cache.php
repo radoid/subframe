@@ -2,7 +2,7 @@
 namespace Subframe;
 
 /**
- * Implements a filesystem caching mechanism
+ * Implements a caching mechanism using PHP opcode cache
  * @package Subframe PHP Framework
  */
 class Cache {
@@ -38,29 +38,39 @@ class Cache {
 	}
 
 	/**
-	 * Stores the item under the filename
-	 * @param string $name
-	 * @param string $content
-	 * @param int|null $lifetime Duration in seconds, or default time will be used
-	 * @return bool true on success or false on failure
+	 * Full path to the item's corresponding file
 	 */
-	public function set(string $name, string $content, ?int $lifetime = null): bool {
-		$path = $this->directory.$name;
-		$isDone = file_put_contents($path, $content, LOCK_EX);
-		if ($isDone)
-			@touch($path, time() + ($lifetime ?: $this->defaultLifetime));
-		return $isDone;
+	protected function getPath(string $name): string {
+		return $this->directory . $name . '.php';
 	}
 
 	/**
-	 * Retrieves the item stored under the filename, if it exists and is still valid
-	 * @param string $name The filename
-	 * @return string|null The content on success or null on failure or expiry
+	 * Stores the item under the filename
+	 * @param string $name
+	 * @param mixed $content
+	 * @param int|null $lifetime Duration in seconds, or default time will be used
+	 * @return bool true on success or false on failure
 	 */
-	public function get(string $name): ?string {
-		if (@filemtime($path = $this->directory.$name) >= time())
-			$content = file_get_contents($path);
-		return $content ?? null;
+	public function set(string $name, $content, ?int $lifetime = null): bool {
+		$path = $this->getPath($name);
+		$php = '<?php $value = '
+				. (is_string($content) ? var_export($content, true) : 'unserialize(' . var_export(serialize($content), true) . ')')
+				. ';';
+		$isSuccess = (file_put_contents($path, $php, LOCK_EX) !== false)
+			and touch($path, time() + ($lifetime ?? $this->defaultLifetime));
+		return $isSuccess;
+	}
+
+	/**
+	 * Retrieves the item stored under the name, if it exists and is still valid; otherwise null
+	 * @param string $name The item's name
+	 * @return mixed|null The content on success or null on failure or expiry
+	 */
+	public function get(string $name) {
+		if ($this->has($name))
+			if (include $this->getPath($name))
+				return $value ?? null;
+		return null;
 	}
 
 	/**
@@ -69,7 +79,7 @@ class Cache {
 	 * @return bool
 	 */
 	public function has(string $name): bool {
-		$mtime = @filemtime($this->directory.$name);
+		$mtime = @filemtime($this->getPath($name));
 		
 		return ($mtime > time());
 	}
@@ -80,7 +90,7 @@ class Cache {
 	 * @return int|null Timestamp or null on failure
 	 */
 	public function getExpiryTime(string $name) {
-		$mtime = @filemtime($this->directory.$name);
+		$mtime = @filemtime($this->getPath($name));
 
 		return $mtime ?? null;
 	}
