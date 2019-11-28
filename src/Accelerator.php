@@ -13,12 +13,12 @@ class Accelerator {
 	/**
 	 * Represents the cache
 	 */
-	private $cache;
+	private Cache $cache;
 
 	/**
 	 * Paths to include in the cache or exclude, as regular expressions
 	 */
-	private $includePath, $excludePath;
+	private string $includePath, $excludePath;
 
 
 	/**
@@ -87,7 +87,7 @@ class Accelerator {
 		if ($result instanceof Throwable)
 			throw $result;
 		
-		$isHtml = array_reduce($headers, function ($isHtml, $header) { return $isHtml || stripos($header, 'Content-Type: text/html') === 0; }, false);
+		$isHtml = array_reduce($headers, fn ($isHtml, $header) => $isHtml || stripos($header, 'Content-Type: text/html') === 0, false);
 		if ($isCachable && $isHtml && strlen($output))
 			$this->cache->set($filename, $acceptsGzip ? gzencode($output) : $output);
 	}

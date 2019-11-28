@@ -13,7 +13,7 @@ class Router {
 	 * All defined routes
 	 * @var array[]
 	 */
-	private $routes = [];
+	private array $routes = [];
 
 
 	/**
