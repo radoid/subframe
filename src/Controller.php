@@ -11,6 +11,20 @@ use Throwable;
 class Controller {
 
 	/**
+	 * The request that the controller is processing
+	 */
+	protected Request $request;
+
+
+	/**
+	 * The constructor
+	 * @param Request $request The actual request
+	 */
+	public function __construct(Request $request) {
+		$this->request = $request;
+	}
+
+	/**
 	 * Outputs a view/template provided with given data
 	 * @param string $__filename The filename of the view, without ".php" extension
 	 * @param array $__data The data

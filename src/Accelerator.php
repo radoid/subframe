@@ -31,30 +31,29 @@ class Accelerator {
 	}
 
 	/**
-	 * Handles the request represented by the global REQUEST_METHOD and REQUEST_URI constants
+	 * Handles the request represented by the global constants REQUEST_METHOD and REQUEST_URI or REDIRECT_URL
 	 */
-	public function handleGlobalRequestUri(Closure $next): void {
-		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$path = $_SERVER['REDIRECT_URL'] ?? rawurldecode(strtok($_SERVER['REQUEST_URI'], '?'));
+	public function handleGlobalRequestUri(callable $next): void {
+		$request = Request::fromGlobalRequestUri();
 
-		$this->handle($method, $path, getallheaders(), $next);
+		$this->handle($request, $next);
 	}
 
 	/**
-	 * Handles the given request. If the response is already in the cache, it is served. Otherwise, a closure is called
-	 * that should generate a response, typically using a router to dispatch the request.
+	 * Handles the given request. If the response is already in the cache, it is served. Otherwise, a callable is called
+	 * that should output a response and set response headers, typically using a router to dispatch the request.
 	 */
-	public function handle(string $method, string $path, array $headers, Closure $next): void {
-		$basePath = strtok($path, '?');
-		$isCachable = ($method == 'GET')
-				&& (isset($this->includePath) ?  preg_match("#$this->includePath#", $basePath) : true)
-				&& (isset($this->excludePath) ? !preg_match("#$this->excludePath#", $basePath) : true);
-		$acceptsGzip = (strpos($headers['Accept-Encoding'] ?? '', 'gzip') !== false && extension_loaded('zlib'));
-		$filename = 'output' . strtr($path, '/?&', '---') . '.html' . ($acceptsGzip ? '.gz' : '');
+	public function handle(Request $request, callable $next): void {
+		$path = $request->getPath();
+		$isCachable = ($request->getMethod() == 'GET')
+				&& (isset($this->includePath) ?  preg_match("#$this->includePath#", $path) : true)
+				&& (isset($this->excludePath) ? !preg_match("#$this->excludePath#", $path) : true);
+		$acceptsGzip = (strpos($request->getHeader('Accept-Encoding') ?? '', 'gzip') !== false && extension_loaded('zlib'));
+		$filename = 'output' . strtr($request->getPathAndQueryString(), '/?&.', '----') . '.html' . ($acceptsGzip ? '.gz' : '');
 		$timestamp = time();
 
 		if ($isCachable) {
-			if (($before = $headers['If-None-Match'] ?? null))
+			if (($before = $request->getHeader('If-None-Match')))
 				if ($before == $this->generateETag($filename, $this->cache->getExpiryTime($filename))) {
 					http_response_code(304); // 304 Not Modified
 					exit;
@@ -77,7 +76,7 @@ class Accelerator {
 
 		ob_start();
 		try {
-			$result = $next($method, $path, $headers);
+			$result = $next($request);
 		} catch (Throwable $e) {
 			$result = $e;
 		}
@@ -87,8 +86,8 @@ class Accelerator {
 		if ($result instanceof Throwable)
 			throw $result;
 		
-		$isHtml = array_reduce($headers, fn ($isHtml, $header) => $isHtml || stripos($header, 'Content-Type: text/html') === 0, false);
-		if ($isCachable && $isHtml && strlen($output))
+		$isText = array_reduce($headers, fn ($isText, $header) => $isText || stripos($header, 'Content-Type: text/') === 0, false);
+		if ($isCachable && $isText && strlen($output))
 			$this->cache->set($filename, $acceptsGzip ? gzencode($output) : $output);
 	}
 
