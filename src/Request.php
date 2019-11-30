@@ -219,6 +219,11 @@ class Request {
 		return $this->headers['host'] ?? null;
 	}
 
+	public function getSchemeAndHost(): ?string {
+		$scheme = (!empty($this->serverParams['HTTPS']) ? 'https://' : 'http://');
+		
+		return $scheme . $this->getHost();
+	}
 
 	/**
 	 * Returns an array representing the named uploaded file, or all files
@@ -245,6 +250,22 @@ class Request {
 					throw new Exception("Upload failed (error #$file[error]).", 400);
 			} else
 				$this->handleFileErrors($file);
+	}
+
+	/**
+	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
+	 * @return boolean
+	 */
+	public function isXmlHttpRequest(): bool {
+		return ($this->headers['x-requested-with'] ?? '') == 'XMLHttpRequest';
+	}
+
+	/**
+	 * Tells whether JSON format is requested (in Accept header field)
+	 * @return boolean
+	 */
+	public function acceptsJson(): bool {
+		return strpos($this->headers['accept'] ?? '', '/json') !== false;
 	}
 
 	/**
