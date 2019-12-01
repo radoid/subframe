@@ -300,4 +300,26 @@ class Request {
 		return $files;
 	}
 
+	/**
+	 * Obtains the User-Agent string, processed into simple browser and OS name and version
+	 */
+	public function getUserAgent(): ?string {
+		$agent = $this->headers['user-agent'] ?? null;
+		if ($agent)
+			if (preg_match('~\b(iPad|iPhone|iPod); U?;? ?CPU (OS|iPhone OS) ([0-9]+)~', $agent, $m))
+				$os = str_replace('_', '.', "$m[1] iOS $m[3]");
+			elseif (preg_match('~\b(Mac OS X [0-9_.]+|Windows NT [0-9.]+|Windows 9\d+|Android\b ?[0-9.]*|Linux \w+|Windows Phone O?S? ?[0-9.]+|J2ME\b)~', $agent, $m))
+				$os = strtr($m[1], ['Mac OS X' => 'macOS', 'Windows NT 5.1' => 'Windows XP', 'Windows NT 6.0' => 'Windows Vista', 'Windows NT 6.1' => 'Windows 7', 'Windows NT 6.2' => 'Windows 8', 'Windows NT 6.3' => 'Windows 8.1', 'Windows NT 10.0' => 'Windows 10']);
+		if (!empty($os)) {
+			if (preg_match('~\b(Opera/|Firefox/|Chrome/|CriOS/|Safari/|MSIE |Trident/)([0-9]+)~', $agent, $m))
+				$agent = str_replace(['CriOS', 'Trident 7'], ['Chrome', 'MSIE 11'], trim($m[1], '/ ')." $m[2]").(!empty ($os) ? " • $os" : "");
+			elseif (preg_match('~\b(AppleWebKit/)([0-9]+)~', $agent, $m))
+				$agent = trim($m[1], '/')." $m[2]".(!empty ($os) ? " • $os" : "");
+			if (strpos($os, 'Android') === 0)
+				$agent = str_replace('Safari', 'Android browser', $agent);
+		}
+
+		return $agent;
+	}
+
 }
