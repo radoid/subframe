@@ -253,6 +253,18 @@ class Request {
 	}
 
 	/**
+	 * The remote address the request was made from, taking X-Forwarded-For header field into accout
+	 * @return string|null
+	 */
+	public function getRemoteAddr(): ?string {
+		if (!empty($this->headers['x-forwarded-for']))
+			foreach (explode(",", $this->headers['x-forwarded-for']) as $ipaddr)
+				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
+					return $ipaddr;
+		return $this->serverParams['REMOTE_ADDR'] ?? null;
+	}
+
+	/**
 	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
 	 * @return boolean
 	 */
