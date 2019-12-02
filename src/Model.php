@@ -41,12 +41,6 @@ abstract class Model extends stdClass {
 	public const Null = NAN;
 
 	/**
-	 * The database interface
-	 * @var PDO
-	 */
-	private static $pdo;
-
-	/**
 	 * Current transaction level
 	 * @var int
 	 */
@@ -176,8 +170,9 @@ abstract class Model extends stdClass {
 	 */
 	public function insert() {
 		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
-		self::$pdo->exec($sql);
-		return self::$pdo->lastInsertId();
+		$pdo = Container::make(PDO::class);
+		$pdo->exec($sql);
+		return $pdo->lastInsertId();
 	}
 
 	/**
@@ -185,14 +180,15 @@ abstract class Model extends stdClass {
 	 * @return int The number of rows affected
 	 */
 	public function upsert(): int {
-		$driver = self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+		$pdo = Container::make(PDO::class);
+		$driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
 		if ($driver == 'sqlite')
 			$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
 					ON CONFLICT DO UPDATE SET $this";
 		else
 			$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
 					ON DUPLICATE KEY UPDATE $this";
-		return self::$pdo->exec($sql);
+		return $pdo->exec($sql);
 	}
 
 	/**
@@ -201,7 +197,8 @@ abstract class Model extends stdClass {
 	 */
 	public function replace(): int {
 		$sql = "REPLACE INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
-		return self::$pdo->exec($sql);
+		$pdo = Container::make(PDO::class);
+		return $pdo->exec($sql);
 	}
 
 	/**
@@ -215,7 +212,8 @@ abstract class Model extends stdClass {
 		if ((is_array($id) && !$id) || !$sql)
 			return 0;
 		$sql = "UPDATE ".static::TABLE." SET $sql WHERE ".static::KEY." IN (".self::quote($id).")";
-		return self::$pdo->exec($sql);
+		$pdo = Container::make(PDO::class);
+		return $pdo->exec($sql);
 	}
 
 	/**
@@ -239,7 +237,8 @@ abstract class Model extends stdClass {
 		if (is_array($id) && !$id)
 			return 0;
 		$sql = "DELETE FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
-		return self::$pdo->exec($sql);
+		$pdo = Container::make(PDO::class);
+		return $pdo->exec($sql);
 	}
 
 	/**
@@ -370,11 +369,12 @@ abstract class Model extends stdClass {
 	 * @return PDOStatement
 	 */
 	public static function query(string $sql, ?array $params = null): PDOStatement {
+		$pdo = Container::make(PDO::class);
 		if ($params) {
-			$stmt = self::$pdo->prepare($sql);
+			$stmt = $pdo->prepare($sql);
 			$stmt->execute($params);
 		} else
-			$stmt = self::$pdo->query($sql);
+			$stmt = $pdo->query($sql);
 		return $stmt;
 	}
 
@@ -385,12 +385,13 @@ abstract class Model extends stdClass {
 	 * @return int The number of rows affected
 	 */
 	public static function exec(string $sql, ?array $params = null): int {
+		$pdo = Container::make(PDO::class);
 		if ($params) {
-			$stmt = self::$pdo->prepare($sql);
+			$stmt = $pdo->prepare($sql);
 			$stmt->execute($params);
 			$affected = $stmt->rowCount();
 		} else
-			$affected = self::$pdo->exec($sql);
+			$affected = $pdo->exec($sql);
 		return $affected;
 	}
 
@@ -402,40 +403,29 @@ abstract class Model extends stdClass {
 	public static function quote($str): string {
 		if (is_array($str))
 			return implode(',', array_map([self::class, 'quote'], $str));
-		if (!self::$pdo)
+		$pdo = Container::make(PDO::class);
+		if (!$pdo)
 			return "'".addslashes($str ?? '')."'";
-		return self::$pdo->quote($str ?? '');
+		return $pdo->quote($str ?? '');
 	}
 
 	/**
 	 * Starts a new transaction
 	 */
 	public static function begin() {
-		if (self::$transactionLevel++ == 0 && !self::$pdo->inTransaction())
-			self::$pdo->beginTransaction();
+		$pdo = Container::make(PDO::class);
+		if (self::$transactionLevel++ == 0 && !$pdo->inTransaction())
+			$pdo->beginTransaction();
 	}
 
 	/**
 	 * Commits the current transaction
 	 */
 	public static function commit() {
-		if (self::$transactionLevel == 1 && self::$pdo->inTransaction())
-			self::$pdo->commit();
+		$pdo = Container::make(PDO::class);
+		if (self::$transactionLevel == 1 && $pdo->inTransaction())
+			$pdo->commit();
 		self::$transactionLevel = max(0, self::$transactionLevel - 1);
-	}
-
-	/**
-	 * Sets up the PDO object representing the database connection
-	 * @param string $dsn The DNS describing the database
-	 * @param string|null $username [optional]
-	 * @param string|null $password [optional]
-	 * @param array $options [optional] Additional PDO options
-	 */
-	public static function connect(string $dsn, ?string $username = null, ?string $password = null, array $options = []): void {
-		self::$pdo = new PDO($dsn, $username, $password, $options + [
-				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-				PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-		]);
 	}
 
 }
