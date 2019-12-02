@@ -11,7 +11,7 @@ use stdClass;
  *
  * @package Subframe PHP Framework
  */
-class Model extends stdClass {
+abstract class Model extends stdClass {
 
 	/**
 	 * Database table name
@@ -57,10 +57,12 @@ class Model extends stdClass {
 
 	/**
 	 * Model constructor, optionally initialising from a data array
-	 * (only fields that are part of the model are taken)
-	 * @param array|null $data associative array with initial data
+	 * (only fields that are part of the model, and not guarded, are taken)
+	 * @param array|object|null $data associative array or object with initial data
 	 */
-	public function __construct(?array $data = null) {
+	public function __construct($data = null) {
+		if (is_object($data))
+			$data = (array)$data;
 		foreach ($this as $key => $value)
 			if (isset($data[$key]) && (!static::GUARDED || !in_array($key, static::GUARDED)))
 				$this->$key = $data[$key];
@@ -172,7 +174,7 @@ class Model extends stdClass {
 	 * Inserts the object into the DB table
 	 * @return string The insert ID
 	 */
-	public function insert(): string {
+	public function insert() {
 		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
 		self::$pdo->exec($sql);
 		return self::$pdo->lastInsertId();
@@ -257,7 +259,7 @@ class Model extends stdClass {
 	 */
 	public static function exists($id): bool {
 		$sql = "SELECT 1 FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).") LIMIT 1";
-		return self::result($sql);
+		return !!self::result($sql);
 	}
 
 	/**
@@ -277,11 +279,11 @@ class Model extends stdClass {
 	/**
 	 * Fetches all records, optionally paged, optionally with keys from a column
 	 * @param int $limit Optionally, maximum number of records
-	 * @param string|null $after_id Optionally, the last ID from the previous request
+	 * @param string|int|float|null $after_id Optionally, the last ID from the previous request, from which to continue
 	 * @param int $page
 	 * @return static[]
 	 */
-	public static function getAll(int $limit = 0, ?string $after_id = null, int $page = 0): array {
+	public static function getAll(int $limit = 0, $after_id = null, int $page = 0): array {
 		$sql = "SELECT * FROM ".static::TABLE
 				.(isset($after_id) ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
 				." ORDER BY ".(static::ORDER ?? static::KEY).($limit >= 0 ? " ASC":" DESC")
@@ -295,10 +297,10 @@ class Model extends stdClass {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return static|null The record or null
 	 */
-	public static function fetch($q, ?array $params = null) {
+	public static function fetch($q, ?array $params = null): ?object {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
-		return $q->fetchObject(static::class != 'Subframe/Model' ? static::class : 'stdClass') ?: null;
+		return $q->fetchObject(static::class != 'Subframe\\Model' ? static::class : 'stdClass') ?: null;
 	}
 
 	/**
@@ -325,10 +327,10 @@ class Model extends stdClass {
 	 * @param string|null $keyColumn
 	 * @return Generator<array>
 	 */
-	public static function generateAll($q, array $params = null, ?string $keyColumn = null): Generator {
+	public static function generateAll($q, ?array $params = null, ?string $keyColumn = null): Generator {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
-		$classname = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
+		$classname = (static::class != 'Subframe\\Model' ? static::class : 'stdClass');
 		while (($o = $q->fetchObject($classname)))
 			if ($keyColumn)
 				yield $o->$keyColumn => $o;
@@ -340,9 +342,9 @@ class Model extends stdClass {
 	 * Fetches a single result
 	 * @param PDOStatement|string $q The query
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
-	 * @return string|null
+	 * @return string|int|float|null
 	 */
-	public static function result($q, ?array $params = null): ?string {
+	public static function result($q, ?array $params = null) {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
@@ -353,7 +355,7 @@ class Model extends stdClass {
 	 * Fetches a column by direct SQL query
 	 * @param string|PDOStatement $q The query
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
-	 * @return string[]
+	 * @return string[]|int[]|float[]
 	 */
 	public static function allResults($q, ?array $params = null): array {
 		if (!$q instanceof PDOStatement)
@@ -409,7 +411,7 @@ class Model extends stdClass {
 	 * Starts a new transaction
 	 */
 	public static function begin() {
-		if (self::$transactionLevel++ == 0)
+		if (self::$transactionLevel++ == 0 && !self::$pdo->inTransaction())
 			self::$pdo->beginTransaction();
 	}
 
@@ -417,7 +419,7 @@ class Model extends stdClass {
 	 * Commits the current transaction
 	 */
 	public static function commit() {
-		if (self::$transactionLevel == 1)
+		if (self::$transactionLevel == 1 && self::$pdo->inTransaction())
 			self::$pdo->commit();
 		self::$transactionLevel = max(0, self::$transactionLevel - 1);
 	}
