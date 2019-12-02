@@ -62,8 +62,8 @@ class Request {
 	 * @param array $get Associated array with parsed GET parameters (like $_GET)
 	 * @param array $post Associated array with parsed POST parameters (like $_POST)
 	 * @param array $files Associated array with uploaded files (like $_FILES)
-	 * @param array $files Associated array with cookies (like $_COOKIE)
-	 * @param array $files Associated array with server parameters (like $_SERVER)
+	 * @param array $cookie Associated array with cookies (like $_COOKIE)
+	 * @param array $server Associated array with server parameters (like $_SERVER)
 	 */
 	public function __construct(string $method, string $pathAndQueryString, array $headers = [], array $get = [], array $post = [], array $files = [], array $cookie = [], array $server = []) {
 		$this->method = $method;
@@ -227,7 +227,9 @@ class Request {
 
 	/**
 	 * Returns an array representing the named uploaded file, or all files
-	 * @return array|null
+	 * @param string|null $name Optional name of the file
+	 * @return array|null The array representing the named file or all files
+	 * @throws Exception
 	 */
 	public function getFiles(?string $name = null): ?array {
 		$this->handleFileErrors($this->files);
@@ -312,9 +314,9 @@ class Request {
 				$os = strtr($m[1], ['Mac OS X' => 'macOS', 'Windows NT 5.1' => 'Windows XP', 'Windows NT 6.0' => 'Windows Vista', 'Windows NT 6.1' => 'Windows 7', 'Windows NT 6.2' => 'Windows 8', 'Windows NT 6.3' => 'Windows 8.1', 'Windows NT 10.0' => 'Windows 10']);
 		if (!empty($os)) {
 			if (preg_match('~\b(Opera/|Firefox/|Chrome/|CriOS/|Safari/|MSIE |Trident/)([0-9]+)~', $agent, $m))
-				$agent = str_replace(['CriOS', 'Trident 7'], ['Chrome', 'MSIE 11'], trim($m[1], '/ ')." $m[2]").(!empty ($os) ? " • $os" : "");
+				$agent = str_replace(['CriOS', 'Trident 7'], ['Chrome', 'MSIE 11'], trim($m[1], '/ ') . " $m[2]") . " • $os";
 			elseif (preg_match('~\b(AppleWebKit/)([0-9]+)~', $agent, $m))
-				$agent = trim($m[1], '/')." $m[2]".(!empty ($os) ? " • $os" : "");
+				$agent = trim($m[1], '/')." $m[2] • $os";
 			if (strpos($os, 'Android') === 0)
 				$agent = str_replace('Safari', 'Android browser', $agent);
 		}
