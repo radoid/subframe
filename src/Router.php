@@ -1,8 +1,6 @@
 <?php
 namespace Subframe;
 
-use ReflectionClass;
-
 /**
  * Implements the application routing
  * @package Subframe PHP Framework
@@ -11,28 +9,29 @@ class Router {
 
 	/**
 	 * All defined routes
-	 * @var array[]
 	 */
 	private array $routes = [];
 
 
 	/**
-	 * Adds a route defined with a callable
+	 * Adds a route defined with a regular expression and a callable
 	 * @param string $method The route's method
 	 * @param string $path The route's path, without trailing slash or query parameters
 	 * @param callable $callable The callable to be executed
-	 * @param array $classArgs Optional arguments for the class constructor, if callable is a class method
+	 * @param array $classArgs In case a class needs to be instantiated for the callable, the arguments for its constructor
+	 * @return self The object itself
 	 */
-	public function addRoute(string $method, string $path, callable $callable, array $classArgs = []): self {
+	public function addRoute(string $method, string $path, $callable, array $classArgs = []): self {
 		$this->routes[] = [$method, $path, $callable, $classArgs];
 
 		return $this;
 	}
 
 	/**
-	 * Adds a namespace with its classes/methods as routes
+	 * Adds a namespace with its classes and methods as routes
 	 * @param string $namespace The namespace
-	 * @param array $classArgs Optional arguments for the class constructor, if callable is a class method
+	 * @param array $classArgs Optional arguments for the class constructor
+	 * @return self The object itself
 	 */
 	public function addNamespace(string $namespace, array $classArgs = []): self {
 		$this->routes[] = [null, null, $namespace, $classArgs];
@@ -41,20 +40,23 @@ class Router {
 	}
 
 	/**
-	 * Tries to dispatch the given request among defined routes
-	 * @return bool true if found a route, otherwise false
+	 * Tries to dispatch the given request among its routes
+	 * @param Request The incoming request
+	 * @return bool true if a route was found and executed, otherwise false
 	 */
 	public function dispatch(Request $request): bool {
+		Container::set(Request::class, $request);
+		
 		foreach ($this->routes as [$method, $path, $action, $classArgs]) {
 			if ($method)
 				$route = $this->matchRoute($request, $method, $path, $action, $classArgs);
 			else
 				$route = $this->matchNamespace($request, $action, $classArgs);
+			
 			if ($route) {
-				[$callable, $args] = $route;
-				$result = call_user_func_array($callable, $args);
-				if ($result !== false)
-					return true;
+				[$callable, $args, $classArgs] = $route;
+				Container::call($callable, $args ?? [], $classArgs ?? []);
+				return true;
 			}
 		}
 
@@ -62,31 +64,30 @@ class Router {
 	}
 
 	/**
-	 * Tries to match a route to the given request
+	 * Tries to match a regular expression route to the given request
 	 * @param Request $request The request
 	 * @param string $method The route's method
 	 * @param string $path The route's path, without trailing slash or query parameters
 	 * @param callable|string $callable A closure or [Controller, action] combination
-	 * @param array $classArgs Optional arguments to the constructor of the class
-	 * @return ?array Array [callable, args] representing a route
+	 * @param array $classArgs In case a class needs to be instantiated for the callable, the arguments for its constructor
+	 * @return ?array An array [callable, args] representing a route
 	 */
 	private function matchRoute(Request $request, string $method, string $path, $callable, array $classArgs = []): ?array {
-		if ($method == $request->getMethod() && preg_match("~^$path$~", $request->getPath(), $matches)) {
-			if (is_array($callable) && is_string($callable[0]))
-				$callable[0] = new $callable[0](...$classArgs);
-			return [$callable, array_slice($matches, 1)];
-		} else
-			return null;
+		if ($method == $request->getMethod() && preg_match("~^$path$~", $request->getPath(), $matches))
+			return [$callable, array_slice($matches, 1), $classArgs];
+
+		return null;
 	}
 
 	/**
 	 * Tries to match the given namespace to the request
 	 * @param Request $request The request
 	 * @param string $namespace The namespace; the root namespace if empty
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return ?array Array [callable, args] representing a route
+	 * @param array $classArgs Optional arguments for the instantiated class constructor
+	 * @return ?array An array [callable, args] representing the route
 	 */
 	private function matchNamespace(Request $request, string $namespace, array $classArgs = []): ?array {
+		$method = $request->getMethod();
 		$path = trim($request->getPath(), '/');
 		$argv = ($path !== '' ? explode('/', $path) : []);
 		$argc = count($argv);
@@ -96,11 +97,11 @@ class Router {
 		for ($i = $argc; $i >= 0; $i--) {
 			$class = join('\\', array_slice($classv, 0, 1+$i));
 			if (class_exists($found = $class.'\\Home'))
-				if (($route = $this->matchClass($found, $request, array_slice($argv, $i), $classArgs)))
+				if (($route = $this->matchClass($found, $method, array_slice($argv, $i), $classArgs)))
 					return $route;
 			if ($i > 0)
 				if (class_exists($found = $class))
-					if (($route = $this->matchClass($found, $request, array_slice($argv, $i), $classArgs)))
+					if (($route = $this->matchClass($found, $method, array_slice($argv, $i), $classArgs)))
 						return $route;
 		}
 
@@ -108,46 +109,42 @@ class Router {
 	}
 
 	/**
-	 * Tries to find a route within a class that fits in with the request's arguments
+	 * Tries to find a route within a class, matching a method name and its arguments
 	 * @param string $class The class to find a route in
-	 * @param Request $request The incoming request
+	 * @param string $requestMethod The request's method
 	 * @param string[] $args The parts of the request's path
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return ?array Array [class, method, args] representing a route
+	 * @param array $classArgs Optional arguments for the class' constructor
+	 * @return ?array An array [callable, args] representing the route
 	 */
-	private function matchClass(string $class, Request $request, array $args, array $classArgs = []): ?array {
-		$requestMethod = strtolower($request->getMethod());
+	private function matchClass(string $class, string $requestMethod, array $args, array $classArgs = []): ?array {
+		$requestMethod = strtolower($requestMethod);
 		$count = count($args);
 
 		// index or methodIndex
 		if ($count == 0
 			&& (method_exists($class, $fn = "{$requestMethod}Index")
 					|| method_exists($class, $fn = 'index')))
-			$route = [$fn, []];
+			$route = [[$class, $fn], [], $classArgs];
 
 		// action or methodAction
 		else if ($count > 0
 			&& (method_exists($class, $fn = $this->actionCase($requestMethod, $args[0]))
 					|| method_exists($class, $fn = $this->actionCase('', $args[0]))))
-			$route = [$fn, array_slice($args, 1)];
+			$route = [[$class, $fn], array_slice($args, 1), $classArgs];
 
 		// resource+action or resource+methodAction
 		else if ($count >= 2
 				&& (method_exists($class, $fn = $this->actionCase($requestMethod, $args[1]))
 						|| method_exists($class, $fn = $this->actionCase('', $args[1])))) {
 			array_splice($args, 1, 1);
-			$route = [$fn, $args];
+			$route = [[$class, $fn], $args, $classArgs];
 
 		// resource
 		} else if (method_exists($class, $fn = $requestMethod))
-			$route = [$fn, $args];
+			$route = [[$class, $fn], $args, $classArgs];
 
-		if (isset($route)) {
-			$r = new ReflectionClass($class);
-			$m = $r->getMethod($route[0]);
-			if ($m->isPublic() && $m->getNumberOfRequiredParameters() <= count($route[1]) && $m->getNumberOfParameters() >= count($route[1]))
-				return [[new $class($request, ...$classArgs), $route[0]], $route[1]];
-		}
+		if (isset($route) && Container::canInjectParameters($route[0], $route[1]))
+			return $route;
 
 		return null;
 	}
