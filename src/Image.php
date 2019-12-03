@@ -9,14 +9,8 @@ use Exception;
  */
 class Image {
 
-	/** @var resource|null */
+	/** @var \GdImage|resource|null */
 	private $image;
-
-	/** @var int */
-	private $width, $height;
-
-	/** @var array|null */
-	private $exif = null;
 
 	/** @var bool */
 	private $isModified = false;
@@ -24,61 +18,84 @@ class Image {
 
 	/**
 	 * The constructor
-	 * @param string $source Image file path
+	 * @param \GdImage|resource $image GD image
 	 * @throws Exception
 	 */
-	public function __construct(string $source) {
-		if (!extension_loaded('gd'))
-			throw new Exception('GD PHP extension is required.', 500);
-		if (!is_readable($source))
-			throw new Exception("File $source not found.", 500);
+	public function __construct($image) {
+		if (!$image || !imagesx($image))
+			throw new Exception('Image source is not a GD image.', 500);
 
-		ini_set('memory_limit', '-1');
-		ini_set('gd.jpeg_ignore_warning', 1);
-
-		$size = getimagesize($source);
-		if (!$size)
-			throw new Exception("File $source is not an image.", 500);
-		[$this->width, $this->height, $type] = $size;
-		if (!$this->width || !$this->height || !$type)
-			throw new Exception("File $source is not an image.", 500);
-
-		if (function_exists('exif_read_data'))
-			$this->exif = @exif_read_data($source) ?: null;
-
-		if ($type == IMAGETYPE_GIF)
-			$this->image = imagecreatefromgif($source);
-		elseif ($type == IMAGETYPE_PNG)
-			$this->image = imagecreatefrompng($source);
-		elseif ($type == IMAGETYPE_BMP || $type == IMAGETYPE_WBMP)
-			$this->image = imagecreatefromwbmp($source);
-		elseif ($type == IMAGETYPE_WEBP)
-			$this->image = imagecreatefromwebp($source);
-		elseif ($type == IMAGETYPE_JPEG || $type == IMAGETYPE_JPEG2000)
-			$this->image = imagecreatefromjpeg($source);
-		else
-			throw new Exception("Unsupported image format in $source.", 500);
-		if (!$this->image)
-			throw new Exception("Cannot create image from $source.", 500);
-
-		$orientation = $this->exif['Orientation'] ?? null;
-		$angle = ($orientation == 8 ? +90 : ($orientation == 3 ? +180 : ($orientation == 6 ? -90 : 0)));
-		if ($angle)
-			$this->rotate($angle);
+		$this->image = $image;
 	}
 
+	/**
+	 * Constructs an image from a file
+	 * @throws Exception
+	 */
+	public static function fromFile(string $filepath): self {
+		if (!extension_loaded('gd'))
+			throw new Exception('Image: GD PHP extension is required.', 500);
+		if (!is_readable($filepath))
+			throw new Exception("Image: cannot read $filepath.", 500);
+
+		ini_set('gd.jpeg_ignore_warning', 1);
+
+		$size = getimagesize($filepath);
+		if (!$size)
+			throw new Exception("Image: unsupported format in $filepath.", 500);
+		[,, $type] = $size;
+
+		if ($type == IMAGETYPE_JPEG || $type == IMAGETYPE_JPEG2000)
+			$image = imagecreatefromjpeg($filepath);
+		elseif ($type == IMAGETYPE_GIF)
+			$image = imagecreatefromgif($filepath);
+		elseif ($type == IMAGETYPE_PNG)
+			$image = imagecreatefrompng($filepath);
+		elseif ($type == IMAGETYPE_WEBP)
+			$image = imagecreatefromwebp($filepath);
+		elseif (defined('IMAGETYPE_AVIF') && $type == IMAGETYPE_AVIF && function_exists('imagecreatefromavif'))
+			$image = imagecreatefromavif($filepath);
+		else
+			throw new Exception("Image: unsupported format in $filepath.", 500);
+		if (!$image)
+			throw new Exception("Image: cannot create image from $filepath.", 500);
+
+		$image = new Image($image);
+
+		if (function_exists('exif_read_data')) {
+			$exif = @exif_read_data($filepath);
+			$orientation = $exif['Orientation'] ?? null;
+			$angle = ($orientation == 3 ? 180 :
+					($orientation >= 5 && $orientation <= 7 ? -90 :
+					($orientation == 8 ? 90 : 0)));
+			if ($angle)
+				$image->rotate($angle);
+			if ($orientation == 2 || $orientation == 5)
+				$image->flipHorizontally();
+			if ($orientation == 4 || $orientation == 7)
+				$image->flipVertically();
+		}
+
+		return $image;
+	}
+
+	/**
+	 * Image's width
+	 */
 	public function getWidth(): int {
 		return imagesx($this->image);
 	}
 
+	/**
+	 * Image's height
+	 */
 	public function getHeight(): int {
 		return imagesy($this->image);
 	}
 
-	public function getExifData(string $key) {
-		return $this->exif[$key] ?? null;
-	}
-
+	/**
+	 * Tells whether the image was resampled
+	 */
 	public function isModified(): bool {
 		return $this->isModified;
 	}
@@ -95,10 +112,12 @@ class Image {
 	 * @throws Exception
 	 */
 	public function resample(int $destWidth, int $destHeight, ?int $srcX = null, ?int $srcY = null, ?int $srcWidth = null, ?int $srcHeight = null): self {
+		$srcWidth ??= $this->getWidth();
+		$srcHeight ??= $this->getHeight();
 		$dest = imagecreatetruecolor($destWidth, $destHeight);
 		if (!$dest)
 			throw new Exception('Cannot create new image.', 500);
-		if (!imagecopyresampled($dest, $this->image, 0, 0, $srcX ?? 0, $srcY ?? 0, $destWidth, $destHeight, $srcWidth ?? $this->width, $srcHeight ?? $this->height))
+		if (!imagecopyresampled($dest, $this->image, 0, 0, $srcX ?? 0, $srcY ?? 0, $destWidth, $destHeight, $srcWidth, $srcHeight))
 			throw new Exception('Cannot resample the image.', 500);
 		$this->image = $dest;
 		$this->isModified = true;
@@ -115,6 +134,32 @@ class Image {
 		$this->image = imagerotate($this->image, $angle, 0);
 		if (!$this->image)
 			throw new Exception('Cannot rotate image.', 500);
+		$this->isModified = true;
+
+		return $this;
+	}
+
+	/**
+	 * Flips the image horizontally
+	 * @throws Exception
+	 */
+	public function flipHorizontally(): self {
+		$isSuccess = imageflip($this->image, IMG_FLIP_HORIZONTAL);
+		if (!$isSuccess)
+			throw new Exception('Cannot flip image.', 500);
+		$this->isModified = true;
+
+		return $this;
+	}
+
+	/**
+	 * Flips the image vertically
+	 * @throws Exception
+	 */
+	public function flipVertically(): self {
+		$isSuccess = imageflip($this->image, IMG_FLIP_VERTICAL);
+		if (!$isSuccess)
+			throw new Exception('Cannot flip image.', 500);
 		$this->isModified = true;
 
 		return $this;
@@ -142,45 +187,41 @@ class Image {
 	}
 
 	/**
-	 * Ensures the image doesn't exceed the given size, cropping the center part if needed
-	 * to best fill the given size, optionally enlarging it when smaller
-	 * @param int $maxWidth
-	 * @param int $maxHeight
-	 * @param bool $canEnlarge
+	 * Resizes the image to the given size so it covers it completely; cuts out the excess if proportions differ
+	 * @param int $width
+	 * @param int $weight
 	 * @return Image
 	 */
-	public function cover(int $maxWidth, int $maxHeight, bool $canEnlarge = true): self {
-		$width  = imagesx($this->image);
-		$height = imagesy($this->image);
-		if ($canEnlarge || $width > $maxWidth || $height > $maxHeight) {
-			$scale = max($maxWidth / $width, $maxHeight / $height);
-			$srcWidth = round($maxWidth / $scale);
-			$srcHeight = round($maxHeight / $scale);
-			$srcX = round(($width - $srcWidth) / 2);
-			$srcY = round(($height - $srcHeight) / 2);
+	public function cover(int $width, int $weight): self {
+		$originalWidth  = imagesx($this->image);
+		$originalHeight = imagesy($this->image);
+		$scale = max($width / $originalWidth, $weight / $originalHeight);
+		$srcWidth = round($width / $scale);
+		$srcHeight = round($weight / $scale);
+		$srcX = round(($originalWidth - $srcWidth) / 2);
+		$srcY = round(($originalHeight - $srcHeight) / 2);
 
-			$this->resample($maxWidth, $maxHeight, $srcX, $srcY, $srcWidth, $srcHeight);
-		}
+		$this->resample($width, $weight, $srcX, $srcY, $srcWidth, $srcHeight);
 
 		return $this;
 	}
 
 	/**
-	 * Saves the image into a file
-	 * @param string|null $destination The path to save the file to
-	 * @param int $destinationType PHP image type constant
+	 * Writes the image into a file or the output buffer
+	 * @param string|null $filepath The path to save the file to, or null to output it into the buffer
+	 * @param int $type PHP image type constant
 	 * @param int $jpegQuality quality value from 0 (worst) to 100 (best)
 	 * @throws Exception
 	 */
-	public function save(string $destination, int $destinationType = IMAGETYPE_JPEG, int $jpegQuality = 98): self {
-		if ($destinationType == IMAGETYPE_GIF)
-			$isSuccess = @imagegif($this->image, $destination);
-		elseif ($destinationType == IMAGETYPE_PNG)
-			$isSuccess = @imagepng($this->image, $destination);
+	public function write(?string $filepath, int $type = IMAGETYPE_JPEG, int $jpegQuality = 98): self {
+		if ($type == IMAGETYPE_GIF)
+			$isSuccess = imagegif($this->image, $filepath);
+		elseif ($type == IMAGETYPE_PNG)
+			$isSuccess = imagepng($this->image, $filepath);
 		else
-			$isSuccess = @imagejpeg($this->image, $destination, $jpegQuality);
+			$isSuccess = imagejpeg($this->image, $filepath, $jpegQuality);
 		if (!$isSuccess)
-			throw new Exception("Cannot write to $destination.", 500);
+			throw new Exception("Image: cannot write to $filepath.", 500);
 
 		return $this;
 	}
