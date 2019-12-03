@@ -1,6 +1,8 @@
 <?php
 namespace Subframe;
 
+use ReflectionMethod;
+
 /**
  * Implements the application routing
  * @package Subframe PHP Framework
@@ -12,6 +14,15 @@ class Router {
 	 */
 	private array $routes = [];
 
+
+	/**
+	 * The constructor
+	 * @param string|null $namespace The optional namespace, its classes and methods representing routes
+	 */
+	public function __construct(?string $namespace = null) {
+		if ($namespace)
+			$this->addNamespace($namespace);
+	}
 
 	/**
 	 * Adds a route defined with a regular expression and a callable
@@ -143,7 +154,9 @@ class Router {
 		} else if (method_exists($class, $fn = $requestMethod))
 			$route = [[$class, $fn], $args, $classArgs];
 
-		if (isset($route) && Container::canInjectParameters($route[0], $route[1]))
+		if (isset($route)
+				&& (new ReflectionMethod($route[0][0], $route[0][1]))->isPublic()
+				&& Container::canInjectParameters($route[0], $route[1]))
 			return $route;
 
 		return null;
