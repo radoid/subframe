@@ -14,7 +14,7 @@ class File
 			@mkdir($parts['dirname'], 0777, true) and @chmod($parts['dirname'], 0777);
 		$parts['basename'] = preg_replace('/\..*/', '', $parts['basename']);
 		$parts['basename'] = self::safe($parts['basename']);
-		$parts['extension'] = self::safe($parts['extension']);
+		$parts['extension'] = (@$parts['extension'] ? self::safe($parts['extension']) : '');
 		$i = "";
 		if (preg_match('~^(.*)(-\d+)$~', $parts['basename'], $matches)) {
 			$parts['basename'] = $matches[1];

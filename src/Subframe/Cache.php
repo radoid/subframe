@@ -41,32 +41,26 @@ class Cache
 	}
 
 	function put($filename, $data, $ttl = 0) {
-		if (!is_string($data))
-			$data = serialize($data);
-		if (!($f = fopen($this->directory . $filename, "w")))
+		$this->set($filename, $data, $ttl);
+	}
+	
+	function set($filename, $data, $ttl = 0) {
+		if (!($f = fopen($path = $this->directory.$filename.'.php', "w")))
 			return false;
 		flock($f, LOCK_EX);
-		$success = fwrite($f, $data);
+		$success = fwrite($f, '<?php $value = '.var_export($data, true).';');
 		flock($f, LOCK_UN);
 		fclose($f);
-		@chmod($this->directory . $filename, 0666);
+		@chmod($path, 0666);
 		if ($success)
-			@touch($this->directory . $filename, time() + ($ttl ? $ttl : $this->ttl));
+			@touch($path, time() + ($ttl ? $ttl : $this->ttl));
 		return true;
 	}
 
 	function get($filename) {
-		if (@filemtime($this->directory . $filename) >= time())
-			return file_get_contents($this->directory . $filename);
-		return false;
-	}
-
-	function serialize($filename, $data, $ttl = 0) {
-		return serialize($this->put($filename, $data, $ttl));
-	}
-
-	function unserialize($filename) {
-		return @unserialize($this->get($filename));
+		if (@filemtime($path = $this->directory.$filename.'.php') >= time())
+			@include $path;
+		return isset($value) ? $value : false;
 	}
 
 	function clean($name = "") {
