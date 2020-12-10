@@ -1,8 +1,8 @@
 {
 	"name": "radoid/subframe",
 	"description": "Subframe PHP microframework",
-	"keywords": "subframe, framework, microframework, mvc",
-	"type": "project",
+	"keywords": ["framework","microframework","mvc"],
+	"type": "library",
 	"licence": "public domain",
 	"require": {
 		"php": ">=7.0.0"
