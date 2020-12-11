@@ -1,15 +1,30 @@
 {
 	"name": "radoid/subframe",
 	"description": "Subframe PHP microframework",
-	"keywords": ["framework","microframework","mvc"],
+	"keywords": [
+		"subframe",
+		"framework",
+		"microframework",
+		"mvc",
+		"model",
+		"controller"
+	],
 	"type": "library",
-	"licence": "public domain",
+	"licence": "proprietary",
+	"authors": [
+		{
+			"name": "Ante Radman",
+			"homepage": "https://radoid.com"
+		}
+	],
 	"require": {
-		"php": ">=7.0.0"
+		"php": ">=7.0.0",
+		"ext-mbstring": "*",
+		"ext-pdo": "*"
 	},
 	"autoload": {
 		"psr-4": {
-			"Subframe\\": "src/"
+			"Subframe\\": "src/Subframe/"
 		}
 	}
 }
