@@ -129,7 +129,7 @@ class Controller
 			@header("HTTP/1.1 $_status Unexpected Error");
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE);
 		//$include_path = set_include_path(self::$views);
-		(include "$_view.php")
+		(include "Controller.php")
 			or trigger_error("View $_view was not found.", E_USER_ERROR);
 		//set_include_path($include_path);
 		error_reporting($error_reporting);
