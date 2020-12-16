@@ -1,11 +1,27 @@
 <?php
+namespace Subframe;
+
+/**
+ * HTTP request functions
+ * @package Subframe PHP Framework
+ */
 class HTTP {
 
-	public static function request($method, $url, $header = [], $content = null, $options = []) {
-		$options += [
+	/**
+	 * Makes an HTTP request
+	 * @param string $method Request method to use
+	 * @param string $url The URL
+	 * @param string[] $header HTTP headers
+	 * @param string|null $content The body of the request
+	 * @param array $options Optional stream context options
+	 * @return array|bool An array with 'status', 'header' and 'content' of the response, or false
+	 */
+	static public function request(string $method, string $url, array $header = [], string $content = null, array $options = []) {
+		$options = [
 				'method' => $method,
 				'header' => implode("\r\n", $header),
 				'content' => $content,
+		] + $options + [
 				'timeout' => 20,
 				'follow_location' => 0,
 				'ignore_errors' => true,

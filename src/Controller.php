@@ -1,16 +1,22 @@
 <?php
-/**
- * Implements the controller mechanism in MVC paradigm
- *
- * @package Subframe PHP Framework
- */
 namespace Subframe;
 
-class Controller
-{
-	static $cache;
+/**
+ * Implements the MVC controller mechanisms
+ * @package Subframe PHP Framework
+ */
+class Controller {
 
-	static function dispatchInClass($class, $argv = null, $cache = null) {
+	/** @var Cache */
+	protected static $cache;
+
+	/**
+	 * Tries to dispatch the request within a class
+	 * @param string $class The class name
+	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
+	 * @param Cache $cache Optional cache if caching is desired
+	 */
+	static public function dispatchInClass($class, $argv = null, $cache = null) {
 		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
 		if ($cache)
 			self::$cache = $cache;
@@ -18,14 +24,14 @@ class Controller
 		if (!($action = self::findActionInClass($class, $args)))
 			return;
 
-		$gzip = (strpos(@$_SERVER['HTTP_ACCEPT_ENCODING'], "gzip") !== false && extension_loaded('zlib') ? ".gz" : "");
+		$gzip = (strpos(@$_SERVER['HTTP_ACCEPT_ENCODING'], "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');
 
-		$cachename = (self::$cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output" . str_replace("/", "-", self::path_info()) . ".html$gzip" : false);
+		$cachename = (self::$cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output" . str_replace("/", "-", self::pathInfo()) . ".html$gzip" : false);
 		if ($cachename) {
 			if (!empty ($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
 				if (self::$cache->ready($cachename, strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']))) {
 					header_remove();
-					header('HTTP/1.0 304 Not Modified');
+					http_response_code(304); // 304 Not Modified
 					exit;
 				}
 			}
@@ -54,7 +60,13 @@ class Controller
 			exit;
 	}
 
-	static function dispatchInNamespace($namespace = '', $argv = null, $cache = null) {
+	/**
+	 * Tries to dispatch the request within a namespace
+	 * @param string $namespace The namespace; the root namespace if empty
+	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
+	 * @param Cache $cache Optional cache if caching is desired
+	 */
+	static public function dispatchInNamespace($namespace = '', $argv = null, $cache = null) {
 		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1)) ?: ['home'];
 		for ($i = 1; $i <= count($args); $i++) {
 			$classname = $namespace.'\\'.implode('\\', array_map([self::class, 'classCase'], array_slice($args, 0, $i)));
@@ -64,7 +76,13 @@ class Controller
 		}
 	}
 
-	static function dispatchInDirectory($directory = '.', $argv = null, $cache = null) {
+	/**
+	 * Tries to dispatch the request within a directory
+	 * @param string $directory The directory; current directory if not provided
+	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
+	 * @param Cache $cache Optional cache if caching is desired
+	 */
+	static public function dispatchInDirectory($directory = '.', $argv = null, $cache = null) {
 		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1)) ?: ['home'];
 		for ($i = 0; $i < count($args); $i++) {
 			$classname = self::classCase($args[$i]);
@@ -77,9 +95,15 @@ class Controller
 		}
 	}
 
-	static function route($method, $uri, $callable) {
+	/**
+	 * Defines a route: checks if the request is compatible with the given URI, and routes the request to the given callable if it is
+	 * @param string $method The HTTP request method
+	 * @param string $uri The URI for the route
+	 * @param callable $callable A closure or [Controller, action] combination
+	 */
+	static public function route($method, $uri, $callable) {
 		if ($method == $_SERVER['REQUEST_METHOD'] && preg_match("~^$uri/*$~", $_SERVER['REQUEST_URI'], $matches)) {
-			list($className, $classMethod) = $callable;
+			[$className, $classMethod] = $callable;
 			$instance = new $className;
 			$args = array_slice($matches, 1);
 			if (call_user_func_array([$instance, $classMethod], $args) !== false)
@@ -87,6 +111,12 @@ class Controller
 		}
 	}
 
+	/**
+	 * Tries to find an action within a specific class that fits in with the request's arguments
+	 * @param string $classname The class in question
+	 * @param string[] $args The request's arguments
+	 * @return string|null The action (function) name
+	 */
 	private static function findActionInClass($classname, &$args) {
 		$method = strtolower(@$_SERVER['REQUEST_METHOD']);
 		// action || methodAction
@@ -107,116 +137,126 @@ class Controller
 			return null;
 	}
 
-	private static function classCase($name) {
-		if (strpbrk($name, '-.'))
-			//return preg_replace_callback('~-+(\w)~', function ($m) {return strtoupper($m[1]);}, ucfirst($action));
-			return strtr(ucwords($name, '-.'), ['-' => '', '.' => '']);
-		return ucfirst($name);
+	/**
+	 * Changes case of the argument as if it was a class name (capital letter on each word boundary)
+	 * @param string $arg The argument
+	 * @return string The result
+	 */
+	private static function classCase($arg) {
+		if (strpbrk($arg, '-.'))
+			return strtr(ucwords($arg, '-.'), ['-' => '', '.' => '']);
+		return ucfirst($arg);
 	}
 
-	private static function actionCase($method, $name) {
-		if (strpbrk($name, '-.'))
-			//return preg_replace_callback('~-+(\w)~', function ($m) {return strtoupper($m[1]);}, $method.ucfirst($action));
-			return strtr(lcfirst($method.ucwords($name, '-.')), ['-' => '', '.' => '']);
-		return $method.ucfirst($name);
+	/**
+	 * Changes case of the argument as if it was an action name (method at the beginning and capital letter on each word boundary)
+	 * @param string $method The HTTP request method
+	 * @param string $arg The argument
+	 * @return string The result
+	 */
+	private static function actionCase($method, $arg) {
+		if (strpbrk($arg, '-.'))
+			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
+		return $method.ucfirst($arg);
 	}
 
-	protected function view($_view, $_data = [], $_status = 200) {
-		extract((array) $_data);
-		if (is_string($_status))
-			@header("HTTP/1.1 $_status");
-		elseif (is_numeric($_status) && $_status != 200)
-			@header("HTTP/1.1 $_status Unexpected Error");
+	/**
+	 * Outputs a view/template provided with given data
+	 * @param string $__filename The filename of the view, without ".php" extension
+	 * @param array|object $__data The data
+	 * @param int $__status The optional HTTP status code
+	 * @throws \Exception
+	 */
+	protected function view($__filename, $__data = [], $__status = 200) {
+		http_response_code($__status);
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE);
-		//$include_path = set_include_path(self::$views);
-		(include "Controller.php")
-			or trigger_error("View $_view was not found.", E_USER_ERROR);
-		//set_include_path($include_path);
+		extract((array) $__data);
+		(include "$__filename.php")
+			or $this->throw("View $__filename was not found.", 500);
 		error_reporting($error_reporting);
 	}
 
-	protected function ob_view($_view, $_data = []) {
+	/**
+	 * Processes a view/template, provided with data, and returns its output
+	 * @param string $filename The filename of the view, without ".php" extension
+	 * @param array|object $data The data
+	 * @return string The output
+	 * @throws \Exception
+	 */
+	protected function getView($filename, $data = []) {
 		ob_start();
-		$this->view($_view, $_data);
+		$this->view($filename, $data);
 		return ob_get_clean();
 	}
 
+	/**
+	 * Outputs JSON encoded object or array
+	 * @param object|array $data The data to output
+	 * @param int $status Optional HTTP status code
+	 */
 	protected function json($data = [], $status = 200) {
-		if (is_string($status))
-			@header("HTTP/1.1 $status");
-		elseif ($status && $status != 200)
-			@header("HTTP/1.1 $status Unexpected Error");
-		if ($status)
-			@header("Content-Type: application/json; charset=utf-8");
-		echo json_encode($data);
+		http_response_code($status);
+		@header("Content-Type: application/json");
+		die(json_encode($data));
 	}
 
-	protected function log($text, $extended = false, $filename = "debug.log") {
-		$text = date("d/m/Y H:i:s") . "  " . (is_string($text) ? $text : json_encode($text));
-		if ($extended)
-			$text .= " ⋅ " . self::remote_addr() . " ⋅ " . self::user_agent();
-		//	$text .= @" ⋅ ← $_SERVER[HTTP_REFERER]";
-		file_put_contents($filename, "$text\n", FILE_APPEND);
-	}
-
+	/**
+	 * Throws an exception; for convenience, as it can be part of an expression
+	 * @param string $message The message of the exception
+	 * @param int $code The code of the exception
+	 * @throws \Exception
+	 */
 	protected function throw($message, $code = 500) {
 		throw new \Exception($message, $code);
 	}
 
 	/**
-	 * Fetches the PATH_INFO system variable
-	 * @return string the variable
+	 * Obtains the PATH_INFO system variable
+	 * @return string The variable
 	 */
-	static function path_info() {
-		return str_replace($_SERVER['SCRIPT_NAME'], "", (!empty ($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : (!empty ($_SERVER['ORIG_PATH_INFO']) ? $_SERVER['ORIG_PATH_INFO'] : "")));
+	private static function pathInfo() {
+		return str_replace($_SERVER['SCRIPT_NAME'], '', $_SERVER['PATH_INFO'] ?? ($_SERVER['ORIG_PATH_INFO'] ?? ''));
 	}
 
 	/**
-	 * Fetches current script arguments in MVC fashion
-	 * @return array Array with the script name, controller name, action name, then arguments from path info, then GET arguments
+	 * Obtains current script arguments
+	 * @return array The array with the arguments
 	 */
-	static function argv() {
+	private static function argv() {
 		global $argv;
-		$path_info = self::path_info();
-		return ($path_info ? explode('/', rtrim($path_info, '/')) : (isset ($argv) ? $argv : []));
+		$pathInfo = self::pathInfo();
+		return ($pathInfo ? explode('/', rtrim($pathInfo, '/')) : ($argv ?? []));
 	}
 
+	/**
+	 * Redirects the request to another URL
+	 * @param string $url The URL to go to
+	 * @param int $code HTTP status code, such as 301; defaults to 302
+	 */
 	protected function redirect($url, $code = 302) {
-		if ($code == 301)
-			header("HTTP/1.1 301 Moved Permanently");
+		http_response_code($code);
 		header("Location: " . str_replace("\n", "\0", $url));
 		exit;
 	}
 
-	static function isAjax() {
+	/**
+	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
+	 * @return boolean
+	 */
+	static public function isAjax() {
 		return (@$_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
 	}
 
-	static function isJson() {
-		return (strpos(@$_SERVER['HTTP_ACCEPT'], "/json") !== false);
-	}
-
-	static function remote_addr() {
+	/**
+	 * Remote address the request was made from
+	 * @return string
+	 */
+	static public function remoteAddr() {
 		if (!empty ($_SERVER['HTTP_X_FORWARDED_FOR']))
 			foreach (explode(",", $_SERVER['HTTP_X_FORWARDED_FOR']) as $ipaddr)
 				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
 					return $ipaddr;
 		return $_SERVER['REMOTE_ADDR'];
-	}
-
-	static function user_agent($agent = "") {
-		$agent = $agent ? $agent : $_SERVER['HTTP_USER_AGENT'];
-		if (preg_match('~\b(?:iPad|iPhone|iPod); U?;? ?CPU (?:OS|iPhone OS) ([0-9]+)~', $agent, $m))
-			$os = str_replace('_', '.', "iOS $m[1]");
-		elseif (preg_match('~\b(Mac OS X [0-9_.]+|Windows NT [0-9.]+|Windows 9\d+|Android\b ?[0-9.]*|Linux \w+|Windows Phone O?S? ?[0-9.]+\b)~', $agent, $m))
-			$os = strtr($m[1], ['Mac OS X' => 'macOS', 'Windows NT 5.1' => 'Windows XP', 'Windows NT 6.0' => 'Windows Vista', 'Windows NT 6.1' => 'Windows 7', 'Windows NT 6.2' => 'Windows 8', 'Windows NT 6.3' => 'Windows 8.1']);
-		if (!empty ($os))
-			if (preg_match('~\b(Opera/|Firefox/|Chrome/|CriOS/|Safari/|MSIE |Trident/)([0-9]+)~', $agent, $m))
-				$agent = str_replace(['CriOS', 'Trident 7'], ['Chrome', 'MSIE 11'], trim($m[1], '/ ')." $m[2]").(!empty ($os) ? " ⋅ $os" : "");
-			elseif (preg_match('~\b(AppleWebKit/)([0-9]+)~', $agent, $m))
-				$agent = trim($m[1], '/')." $m[2]".(!empty ($os) ? " ⋅ $os" : "");
-
-		return $agent;
 	}
 
 }
