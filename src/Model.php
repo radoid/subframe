@@ -182,7 +182,7 @@ class Model
 			$q = self::query($q);
 		$classname = (static::class != 'Model' ? static::class : 'stdClass');
 		if (!$keyColumn)
-			return $q->fetchAll(PDO::FETCH_CLASS, $classname);
+			return $q->fetchAll(\PDO::FETCH_CLASS, $classname);
 		for ($objects = []; ($o = $q->fetchObject($classname)); $objects[$o->$keyColumn] = $o);
 		return $objects;
 	}
@@ -201,7 +201,7 @@ class Model
 	static function allResults($q) {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q);
-		return $q->fetchAll(PDO::FETCH_COLUMN);
+		return $q->fetchAll(\PDO::FETCH_COLUMN);
 	}
 
 	static function query(string $sql, array $params = null) {
