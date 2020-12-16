@@ -1,4 +1,6 @@
-Copyright (c) 2009-2013 Radoid Studio (http://radoid.com)
+The MIT License
+
+Copyright (c) Radoid Studio (http://radoid.com)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
