@@ -214,15 +214,15 @@ class Controller {
 	 * Obtains the PATH_INFO system variable
 	 * @return string The variable
 	 */
-	private static function pathInfo() {
+	protected static function pathInfo() {
 		return str_replace($_SERVER['SCRIPT_NAME'], '', $_SERVER['PATH_INFO'] ?? ($_SERVER['ORIG_PATH_INFO'] ?? ''));
 	}
 
 	/**
-	 * Obtains current script arguments
+	 * Obtains the current script's arguments
 	 * @return array The array with the arguments
 	 */
-	private static function argv() {
+	protected static function argv() {
 		global $argv;
 		$pathInfo = self::pathInfo();
 		return ($pathInfo ? explode('/', rtrim($pathInfo, '/')) : ($argv ?? []));

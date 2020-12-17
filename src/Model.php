@@ -244,7 +244,7 @@ class Model {
 		$sql = "SELECT * FROM ".static::TABLE
 				.($after_id ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
 				." ORDER BY ".static::KEY." DESC"
-				.($limit ? " LIMIT ".intval($limit) : "");
+				.($limit ? " LIMIT ".abs($limit) : "");
 		return static::fetchAll($sql);
 	}
 
