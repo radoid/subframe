@@ -251,25 +251,27 @@ class Model {
 	/**
 	 * Fetches a record by direct SQL query
 	 * @param string|\PDOStatement $q The query as an SQL string or PDOStatement
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return static|null The record
 	 * @throws \Exception
 	 */
-	static public function fetch($q) {
+	static public function fetch($q, array $params = null) {
 		if (!$q instanceof \PDOStatement)
-			$q = self::query($q);
+			$q = self::query($q, $params);
 		return $q->fetchObject(static::class != 'Model' ? static::class : 'stdClass');
 	}
 
 	/**
 	 * Fetches records by direct SQL query, optionally indexed by a column
 	 * @param string|\PDOStatement $q The query as an SQL string or PDOStatement
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @param string $indexColumn
 	 * @return static[] The records
 	 * @throws \Exception
 	 */
-	static public function fetchAll($q, $indexColumn = '') {
+	static public function fetchAll($q, array $params = null, $indexColumn = '') {
 		if (!$q instanceof \PDOStatement)
-			$q = self::query($q);
+			$q = self::query($q, $params);
 		$classname = (static::class != 'Model' ? static::class : 'stdClass');
 		if (!$indexColumn)
 			return $q->fetchAll(\PDO::FETCH_CLASS, $classname);
@@ -280,12 +282,13 @@ class Model {
 	/**
 	 * Fetches a single result (column) by direct SQL query
 	 * @param string|\PDOStatement $q The query
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string|null
 	 * @throws \Exception
 	 */
-	static public function result($q) {
+	static public function result($q, array $params = null) {
 		if (!$q instanceof \PDOStatement)
-			$q = self::query($q);
+			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
 		return $result !== false ? $result : null;
 	}
@@ -293,19 +296,20 @@ class Model {
 	/**
 	 * Fetches a column by direct SQL query
 	 * @param string|\PDOStatement $q The query
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string[]
 	 * @throws \Exception
 	 */
-	static public function allResults($q) {
+	static public function allResults($q, array $params = null) {
 		if (!$q instanceof \PDOStatement)
-			$q = self::query($q);
+			$q = self::query($q, $params);
 		return $q->fetchAll(\PDO::FETCH_COLUMN);
 	}
 
 	/**
 	 * Performs an SQL query, optionally a prepared statement
 	 * @param string $sql The query
-	 * @param array|null $params Optional parameters for a prepared statement
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return \PDOStatement
 	 * @throws \Exception
 	 */
@@ -329,6 +333,20 @@ class Model {
 		if (!self::$pdo)
 			return "'".addslashes($str)."'";
 		return self::$pdo->quote($str);
+	}
+
+	/**
+	 * Sets up the PDO object representing the database connection
+	 * @param string $dsn
+	 * @param string $username [optional]
+	 * @param string $password [optional]
+	 * @param array $options [optional]
+	 */
+	static public function connect(string $dsn, string $username = '', string $password = '', array $options = []) {
+		self::$pdo = new \PDO($dsn, $username, $password, $options + [
+				\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+				\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
+		]);
 	}
 
 }
