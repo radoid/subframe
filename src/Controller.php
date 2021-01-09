@@ -67,12 +67,14 @@ class Controller {
 	 * @param Cache $cache Optional cache if caching is desired
 	 */
 	static public function dispatchInNamespace($namespace = '', $argv = null, $cache = null) {
-		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1)) ?: ['home'];
-		for ($i = 1; $i <= count($args); $i++) {
-			$classname = $namespace.'\\'.implode('\\', array_map([self::class, 'classCase'], array_slice($args, 0, $i)));
-			if (class_exists($classname)
-					|| (($classname = $classname.'Controller') && class_exists($classname)))
-				self::dispatchInClass($classname, array_slice($args, $i), $cache);
+		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
+		$names = array_merge($args, ['home']);
+		$class = $namespace;
+		for ($i = 0; $i < count($names); $i++) {
+			$class .= '\\'.self::classCase($names[$i]);
+			if (class_exists($found = $class)
+					|| class_exists($found = $class.'Controller'))
+				self::dispatchInClass($found, array_slice($args, $i+1), $cache);
 		}
 	}
 
