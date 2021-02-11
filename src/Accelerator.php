@@ -5,7 +5,7 @@ use Closure;
 use Throwable;
 
 /**
- * Implements a simple HTTP cache based on file and opcode caching
+ * Implements a simple HTTP cache
  * @package Subframe
  */
 class Accelerator {
@@ -13,7 +13,7 @@ class Accelerator {
 	/**
 	 * Represents the cache
 	 */
-	private Cache $cache;
+	private FileCache $cache;
 
 	/**
 	 * Paths to include in the cache or exclude, as regular expressions
@@ -24,7 +24,7 @@ class Accelerator {
 	/**
 	 * The constructor
 	 */
-	public function __construct(Cache $cache, ?string $include = null, ?string $exclude = null) {
+	public function __construct(FileCache $cache, ?string $include = null, ?string $exclude = null) {
 		$this->cache = $cache;
 		$this->includePath = $include;
 		$this->excludePath = $exclude;
