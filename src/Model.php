@@ -30,8 +30,8 @@ class Model {
 	 * @param $data
 	 * @return static
 	 */
-	static public function __set_state($data) {
-		return new static($data, true);
+	public static function __set_state($data) {
+		return new static($data);
 	}
 
 	/**
@@ -99,7 +99,7 @@ class Model {
 	 * @param string|null $index Optionally, the field to serve as index
 	 * @return array
 	 */
-	static public function column(array $objects, $field, $index = null) {
+	public static function column(array $objects, $field, $index = null) {
 		$array = [];
 		$i = 0;
 		foreach ($objects as $object)
@@ -114,7 +114,7 @@ class Model {
 	 * @param string|null $index Optionally, the field to serve as index
 	 * @return array|object
 	 */
-	static public function columns($objects, array $fields, $index = null) {
+	public static function columns($objects, array $fields, $index = null) {
 		$fields = array_flip($fields);
 		if (is_object($objects))
 			return (object)array_intersect_key((array)$objects, $fields);
@@ -184,9 +184,10 @@ class Model {
 	 */
 	public function update($id = null) {
 		$id = (isset($id) ? $id : $this->{static::KEY});
-		if (is_array($id) && !$id)
+		$sql = strval($this);
+		if (is_array($id) && !$id || !$sql)
 			return;
-		$sql = "UPDATE ".static::TABLE." SET $this WHERE ".static::KEY." IN (".self::quote($id).")";
+		$sql = "UPDATE ".static::TABLE." SET $sql WHERE ".static::KEY." IN (".self::quote($id).")";
 		self::$pdo->exec($sql);
 	}
 
@@ -195,7 +196,7 @@ class Model {
 	 * @param string|string[] $id
 	 * @param array|object $data
 	 */
-	static public function set($id, $data) {
+	public static function set($id, $data) {
 		if ($id || !is_array($id))
 			(new static($data))->update($id);
 	}
@@ -204,11 +205,20 @@ class Model {
 	 * Deletes DB record(s) identified by the ID(s)
 	 * @param string|string[] $id
 	 */
-	static public function delete($id) {
+	public static function delete($id) {
 		if (is_array($id) && !$id)
 			return;
 		$sql = "DELETE FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
 		self::$pdo->exec($sql);
+	}
+
+	/** Returns the total record count in the table
+	 * @return int
+	 * @throws \Exception
+	 */
+	public static function count() {
+		$sql = "SELECT COUNT(*) FROM ".static::TABLE;
+		return self::result($sql);
 	}
 
 	/**
@@ -217,34 +227,39 @@ class Model {
 	 * @return boolean
 	 * @throws \Exception
 	 */
-	static public function exists($id) {
+	public static function exists($id) {
 		$sql = "SELECT 1 FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).") LIMIT 1";
 		return !!self::result($sql);
 	}
 
 	/**
-	 * Fetches one record by its ID
-	 * @param string $id The ID to look for
-	 * @return static|null The record
+	 * Fetches one or more records by their ID(s)
+	 * @param string|string[] $id The ID(s) to look for
+	 * @return static|static[]|null The record
 	 * @throws \Exception
 	 */
-	static public function get($id) {
-		$sql = "SELECT * FROM ".static::TABLE." WHERE ".static::KEY." = ".self::quote($id)." LIMIT 1";
-		return static::fetch($sql);
+	public static function get($id) {
+		$sql = "SELECT * FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
+		if (!is_array($id))
+			return static::fetch($sql);
+		elseif ($id)
+			return static::fetchAll($sql);
+		return [];
 	}
 
 	/**
 	 * Fetches all records, optionally paged
 	 * @param int $limit Optionally, maximum number of records
-	 * @param int $after_id Optionally, the last ID from the previous request
+	 * @param string $after_id Optionally, the last ID from the previous request
+	 * @param int $page Optional page number, starting from zero
 	 * @return static[]|null
 	 * @throws \Exception
 	 */
-	static public function getAll($limit = 0, $after_id = 0) {
+	public static function getAll($limit = 0, $after_id = '', $page = 0) {
 		$sql = "SELECT * FROM ".static::TABLE
 				.($after_id ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
-				." ORDER BY ".static::KEY." DESC"
-				.($limit ? " LIMIT ".abs($limit) : "");
+				." ORDER BY ".(static::ORDER ?? static::KEY).($limit >= 0 ? " ASC":" DESC")
+				.($limit ? " LIMIT ".($page ? abs($page*$limit).',':'') . abs($limit) : "");
 		return static::fetchAll($sql);
 	}
 
@@ -255,7 +270,7 @@ class Model {
 	 * @return static|null The record
 	 * @throws \Exception
 	 */
-	static public function fetch($q, array $params = null) {
+	public static function fetch($q, array $params = null) {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchObject(static::class != 'Model' ? static::class : 'stdClass');
@@ -269,7 +284,7 @@ class Model {
 	 * @return static[] The records
 	 * @throws \Exception
 	 */
-	static public function fetchAll($q, array $params = null, $indexColumn = '') {
+	public static function fetchAll($q, array $params = null, $indexColumn = '') {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q, $params);
 		$classname = (static::class != 'Model' ? static::class : 'stdClass');
@@ -286,7 +301,7 @@ class Model {
 	 * @return string|null
 	 * @throws \Exception
 	 */
-	static public function result($q, array $params = null) {
+	public static function result($q, array $params = null) {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
@@ -300,7 +315,7 @@ class Model {
 	 * @return string[]
 	 * @throws \Exception
 	 */
-	static public function allResults($q, array $params = null) {
+	public static function allResults($q, array $params = null) {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchAll(\PDO::FETCH_COLUMN);
@@ -313,8 +328,11 @@ class Model {
 	 * @return \PDOStatement
 	 * @throws \Exception
 	 */
-	static public function query(string $sql, array $params = null) {
-		$stmt = self::$pdo->{$params ? 'prepare':'query'}($sql);
+	public static function query(string $sql, array $params = null) {
+		if ($params)
+			$stmt = self::$pdo->prepare($sql);
+		else
+			$stmt = self::$pdo->query($sql);
 		if (!$stmt)
 			throw new \Exception(self::$pdo->errorInfo()[2], 500);
 		if ($params)
@@ -327,7 +345,7 @@ class Model {
 	 * @param string $str
 	 * @return string
 	 */
-	static public function quote($str) {
+	public static function quote($str) {
 		if (is_array($str))
 			return implode(',', array_map([self::class, 'quote'], $str));
 		if (!self::$pdo)
@@ -342,7 +360,7 @@ class Model {
 	 * @param string $password [optional]
 	 * @param array $options [optional]
 	 */
-	static public function connect(string $dsn, string $username = '', string $password = '', array $options = []) {
+	public static function connect(string $dsn, string $username = '', string $password = '', array $options = []) {
 		self::$pdo = new \PDO($dsn, $username, $password, $options + [
 				\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
 				\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
