@@ -2,89 +2,37 @@
 namespace Subframe;
 
 /**
- * Implements the MVC controller mechanisms
+ * Implements the routing and MVC controller mechanisms
  * @package Subframe PHP Framework
  */
 class Controller {
 
-	/** @var Cache */
-	protected static $cache;
-
-	/**
-	 * Tries to dispatch the request within a class
-	 * @param string $class The class name
-	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
-	 * @param Cache $cache Optional cache if caching is desired
-	 */
-	static public function dispatchInClass($class, $argv = null, $cache = null) {
-		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
-		if ($cache)
-			self::$cache = $cache;
-
-		if (!($action = self::findActionInClass($class, $args)))
-			return;
-
-		$gzip = (strpos(@$_SERVER['HTTP_ACCEPT_ENCODING'], "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');
-
-		$cachename = (self::$cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output" . str_replace("/", "-", self::pathInfo()) . ".html$gzip" : false);
-		if ($cachename) {
-			if (!empty ($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
-				if (self::$cache->ready($cachename, strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']))) {
-					header_remove();
-					http_response_code(304); // 304 Not Modified
-					exit;
-				}
-			}
-			header("Last-Modified: " . date("r"));
-			header("Vary: Accept-Encoding");
-			if (self::$cache->ready($cachename)) {
-				if ($gzip) {
-					ini_set('zlib.output_compression', 'Off');
-					header('Content-Encoding: gzip');
-				}
-				self::$cache->dump($cachename);
-				exit;
-			}
-		}
-
-		if ($cachename)
-			ob_start();
-
-		$instance = new $class;
-		$result = call_user_func_array([$instance, $action], $args);
-
-		if ($cachename)
-			self::$cache->put($cachename, $gzip ? gzencode(ob_get_contents()) : ob_get_contents());
-
-		if ($result !== false)
-			exit;
-	}
-
 	/**
 	 * Tries to dispatch the request within a namespace
 	 * @param string $namespace The namespace; the root namespace if empty
+	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
 	 * @param Cache $cache Optional cache if caching is desired
 	 */
-	static public function dispatchInNamespace($namespace = '', $argv = null, $cache = null) {
-		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
-		$names = array_merge($args, ['home']);
-		$class = $namespace;
-		for ($i = 0; $i < count($names); $i++) {
-			$class .= '\\'.self::classCase($names[$i]);
-			if (class_exists($found = $class)
-					|| class_exists($found = $class.'Controller'))
-				self::dispatchInClass($found, array_slice($args, $i+1), $cache);
+	public static function routeInNamespace($namespace = '', array $classArgs = [], $argv = null, $cache = null) {
+		$argv = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
+		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+		if (($route = self::findRouteInNamespace($namespace, $method, $argv))) {
+			[$class, $action, $args] = $route;
+			$instance = new $class(...$classArgs);
+			self::dispatch([$instance, $action], $args, $cache);
 		}
 	}
 
 	/**
 	 * Tries to dispatch the request within a directory
 	 * @param string $directory The directory; current directory if not provided
+	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
 	 * @param Cache $cache Optional cache if caching is desired
 	 */
-	static public function dispatchInDirectory($directory = '.', $argv = null, $cache = null) {
+	public static function routeInDirectory($directory = '.', array $classArgs = [], $argv = null, $cache = null) {
 		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1)) ?: ['home'];
 		for ($i = 0; $i < count($args); $i++) {
 			$classname = self::classCase($args[$i]);
@@ -92,7 +40,7 @@ class Controller {
 			if (file_exists("$classpath/$classname.php")
 					|| (($classname = $classname.'Controller') && file_exists("$classpath/$classname.php"))) {
 				include_once "$classpath/$classname.php";
-				self::dispatchInClass($classname, array_slice($args, $i+1), $cache);
+				self::routeInClass($classname, $classArgs, array_slice($args, $i + 1), $cache);
 			}
 		}
 	}
@@ -102,25 +50,58 @@ class Controller {
 	 * @param string $method The HTTP request method
 	 * @param string $uri The URI for the route
 	 * @param callable $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @param Cache $cache Optional cache if caching is desired
 	 */
-	static public function route($method, $uri, $callable) {
+	public static function route($method, $uri, $callable, array $classArgs = [], $cache = null) {
 		if ($method == $_SERVER['REQUEST_METHOD'] && preg_match("~^$uri/*$~", $_SERVER['REQUEST_URI'], $matches)) {
-			[$className, $classMethod] = $callable;
-			$instance = new $className;
+			if (is_array($callable) && is_string($callable[0]))
+				$callable[0] = new $callable[0](...$classArgs);
 			$args = array_slice($matches, 1);
-			if (call_user_func_array([$instance, $classMethod], $args) !== false)
-				exit;
+			self::dispatch($callable, $args, $cache);
 		}
+	}
+
+	/**
+	 * Tries to find a route within a namespace
+	 * @param string $namespace
+	 * @param string $method HTTP method
+	 * @param null $argv
+	 * @return array|null
+	 */
+	public static function findRouteInNamespace($namespace, $method, $argv = null) {
+		$argv = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
+		$class = $namespace;
+		for ($i = 0; $i <= count($argv); $i++) {
+			if (class_exists($found = $class.'\\Home')
+					|| class_exists($found = $class.'Controller')) {
+				$args = array_slice($argv, $i);
+				if (($action = self::findRouteInClass($found, $method, $args)))
+					return [$found, $action, $args];
+			}
+			if ($i < count($argv)) {
+				$class .= '\\'.self::classCase($argv[$i]);
+				if (class_exists($found = $class)
+						|| class_exists($found = $class.'Controller')) {
+					$args = array_slice($argv, $i + 1);
+					if (($action = self::findRouteInClass($found, $method, $args)))
+						return [$found, $action, $args];
+				}
+			}
+		}
+
+		return null;
 	}
 
 	/**
 	 * Tries to find an action within a specific class that fits in with the request's arguments
 	 * @param string $classname The class in question
+	 * @param string $method HTTP method
 	 * @param string[] $args The request's arguments
 	 * @return string|null The action (function) name
 	 */
-	private static function findActionInClass($classname, &$args) {
-		$method = strtolower(@$_SERVER['REQUEST_METHOD']);
+	public static function findRouteInClass($classname, $method, &$args) {
+		$method = strtolower($method);
 		// action || methodAction
 		if (method_exists($classname, $fn = self::actionCase($method, @$args[0] ?: 'index'))
 				|| method_exists($classname, $fn = self::actionCase('', @$args[0] ?: 'index'))) {
@@ -137,6 +118,48 @@ class Controller {
 			return $fn;
 		} else
 			return null;
+	}
+
+	/**
+	 * Dispatches the request to a callable
+	 * @param callable $callable
+	 * @param array $args
+	 * @param null $cache
+	 */
+	private static function dispatch(callable $callable, array $args, $cache = null) {
+		$gzip = (strpos(@$_SERVER['HTTP_ACCEPT_ENCODING'], "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');
+
+		$cachename = ($cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output".str_replace("/", "-", $_SERVER['REQUEST_URI']).".html$gzip" : false);
+		if ($cachename) {
+			if (!empty ($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
+				if ($cache->has($cachename, strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']))) {
+					header_remove();
+					http_response_code(304); // 304 Not Modified
+					exit;
+				}
+			}
+			header("Last-Modified: ".date("r"));
+			header("Vary: Accept-Encoding");
+			if ($cache->has($cachename)) {
+				if ($gzip) {
+					ini_set('zlib.output_compression', 'Off');
+					header('Content-Encoding: gzip');
+				}
+				$cache->dump($cachename);
+				exit;
+			}
+		}
+
+		if ($cachename)
+			ob_start();
+
+		$result = call_user_func_array($callable, $args);
+
+		if ($cachename)
+			$cache->put($cachename, $gzip ? gzencode(ob_get_contents()) : ob_get_contents());
+
+		if ($result !== false)
+			exit;
 	}
 
 	/**
@@ -159,7 +182,31 @@ class Controller {
 	private static function actionCase($method, $arg) {
 		if (strpbrk($arg, '-.'))
 			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
-		return $method.ucfirst($arg);
+		return ($method ? $method.ucfirst($arg) : $arg);
+	}
+
+	/**
+	 * Obtains the current request's argument vector
+	 * @return array The array with the arguments
+	 */
+	private static function argv() {
+		global $argv;
+		$uri = $_SERVER['REQUEST_URI'] ?? '';
+		$uri = substr($uri, 0, strcspn($uri, '?'));
+		return ($uri ? explode('/', rtrim($uri, '/')) : ($argv ?? []));
+	}
+
+	/**
+	 * Sets the ETag header and triggers 304 response if ETags match
+	 * @param string $etag The ETag value
+	 */
+	protected function setETag($etag) {
+		if (($before = $_SERVER['HTTP_IF_NONE_MATCH'] ?? ''))
+			if ($before == $etag) {
+				http_response_code(304); // 304 Not Modified
+				exit;
+			}
+		header("ETag: $etag");
 	}
 
 	/**
@@ -174,7 +221,7 @@ class Controller {
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE);
 		extract((array) $__data);
 		(include "$__filename.php")
-			or $this->throw("View $__filename was not found.", 500);
+			or $this->throw("\"$__filename\" view not found", 500);
 		error_reporting($error_reporting);
 	}
 
@@ -213,24 +260,6 @@ class Controller {
 	}
 
 	/**
-	 * Obtains the PATH_INFO system variable
-	 * @return string The variable
-	 */
-	protected static function pathInfo() {
-		return str_replace($_SERVER['SCRIPT_NAME'], '', $_SERVER['PATH_INFO'] ?? ($_SERVER['ORIG_PATH_INFO'] ?? ''));
-	}
-
-	/**
-	 * Obtains the current script's arguments
-	 * @return array The array with the arguments
-	 */
-	protected static function argv() {
-		global $argv;
-		$pathInfo = self::pathInfo();
-		return ($pathInfo ? explode('/', rtrim($pathInfo, '/')) : ($argv ?? []));
-	}
-
-	/**
 	 * Redirects the request to another URL
 	 * @param string $url The URL to go to
 	 * @param int $code HTTP status code, such as 301; defaults to 302
@@ -245,7 +274,7 @@ class Controller {
 	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
 	 * @return boolean
 	 */
-	static public function isAjax() {
+	public static function isAjax() {
 		return (@$_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
 	}
 
@@ -253,7 +282,7 @@ class Controller {
 	 * Remote address the request was made from
 	 * @return string
 	 */
-	static public function remoteAddr() {
+	public static function remoteAddr() {
 		if (!empty ($_SERVER['HTTP_X_FORWARDED_FOR']))
 			foreach (explode(",", $_SERVER['HTTP_X_FORWARDED_FOR']) as $ipaddr)
 				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)

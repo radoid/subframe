@@ -30,41 +30,41 @@ class Cache {
 	}
 
 	/**
-	 * Checks whether an item in the cache and is still valid
-	 * @param string $filename The file name of the item
+	 * Checks whether an item exists in the cache and is still valid
+	 * @param string $name The file name of the item
 	 * @param int $lastModified Optional timestamp of the last modification (to also check whether the content is new, not just valid)
 	 * @return bool
 	 */
-	public function ready($filename, $lastModified = 0) {
-		if (@filemtime($this->directory . $filename) > time())
+	public function has($name, $lastModified = 0) {
+		if (@filemtime($this->directory.$name) > time())
 			if ($lastModified)
-				return ($lastModified >= @filectime($this->directory . $filename));
+				return ($lastModified >= @filectime($this->directory.$name));
 			else
 				return true;
 		return false;
 	}
 
 	/**
-	 * Outputs the content
-	 * @param string $filename The file name with the content
+	 * Outputs the item's content
+	 * @param string $name The file name with the content
 	 * @return int|boolean Number of bytes read/output, or false on error
 	 */
-	public function dump($filename) {
-		return readfile($this->directory . $filename);
+	public function dump($name) {
+		return readfile($this->directory.$name);
 	}
 
 	/**
 	 * Stores the item under the filename
-	 * @param string $filename The filename
-	 * @param mixed $value The content, of any type
+	 * @param string $name
+	 * @param string $content
 	 * @param int $ttl Expiry time in seconds, or default time will be used
 	 * @return bool true on success or false on failure
 	 */
-	public function put($filename, $value, $ttl = 0) {
-		if (!($f = fopen($path = $this->directory.$filename.'.php', "w")))
+	public function put($name, $content, $ttl = 0) {
+		if (!($f = fopen($path = $this->directory.$name, "w")))
 			return false;
 		flock($f, LOCK_EX);
-		$success = fwrite($f, '<?php $value = '.var_export($value, true).';');
+		$success = fwrite($f, $content);
 		flock($f, LOCK_UN);
 		fclose($f);
 		@chmod($path, 0666);
@@ -75,13 +75,13 @@ class Cache {
 
 	/**
 	 * Retrieves the item stored under the filename, if it exists and is still valid
-	 * @param string $filename The filename
+	 * @param string $name The filename
 	 * @return mixed|bool The content on success or false on failure or expiry
 	 */
-	public function get($filename) {
-		if (@filemtime($path = $this->directory.$filename.'.php') >= time())
-			@include $path;
-		return isset($value) ? $value : false;
+	public function get($name) {
+		if (@filemtime($path = $this->directory.$name) >= time())
+			$content = file_get_contents($path);
+		return isset($content) ? $content : false;
 	}
 
 	/**
@@ -96,6 +96,37 @@ class Cache {
 					if (!@unlink($this->directory . $filename))
 						return false;
 		return true;
+	}
+
+	/** Stores the value of any type, serialized
+	 * @param string $name
+	 * @param string $data
+	 * @param int $ttl Expiry time in seconds, or default time will be used
+	 * @return bool true on success or false on failure
+	 */
+	public function serialize($name, $data, $ttl = 0) {
+		$content = var_export($data, true);
+		return $this->put("$name.php", $content, $ttl);
+	}
+
+	/**
+	 * Retrieves and unserializes the data
+	 * @param string $name
+	 * @return bool|mixed The data, or false on error
+	 */
+	public function unserialize($name) {
+		if (@filemtime($path = $this->directory.$name.'.php') >= time())
+			$data = @(include $path);
+		return isset($data) ? $data : false;
+	}
+
+	/**
+	 * Whether the cache holds the item and it is still valid
+	 * @param string $name
+	 * @return bool
+	 */
+	public function hasSerialized($name) {
+		return $this->has("$name.php");
 	}
 
 }
