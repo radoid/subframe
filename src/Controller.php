@@ -26,26 +26,6 @@ class Controller {
 	}
 
 	/**
-	 * Tries to dispatch the request within a directory
-	 * @param string $directory The directory; current directory if not provided
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
-	 * @param Cache $cache Optional cache if caching is desired
-	 */
-	public static function routeInDirectory($directory = '.', array $classArgs = [], $argv = null, $cache = null) {
-		$args = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1)) ?: ['home'];
-		for ($i = 0; $i < count($args); $i++) {
-			$classname = self::classCase($args[$i]);
-			$classpath = rtrim($directory.'/'.implode('/', array_slice($args, 0, $i)), '/');
-			if (file_exists("$classpath/$classname.php")
-					|| (($classname = $classname.'Controller') && file_exists("$classpath/$classname.php"))) {
-				include_once "$classpath/$classname.php";
-				self::routeInClass($classname, $classArgs, array_slice($args, $i + 1), $cache);
-			}
-		}
-	}
-
-	/**
 	 * Defines a route: checks if the request is compatible with the given URI, and routes the request to the given callable if it is
 	 * @param string $method The HTTP request method
 	 * @param string $uri The URI for the route
@@ -70,23 +50,24 @@ class Controller {
 	 * @return array|null
 	 */
 	public static function findRouteInNamespace($namespace, $method, $argv = null) {
-		$argv = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
+		if (is_string($argv)) {
+			$argv = trim($argv, '/');
+			$argv = ($argv !== '' ? explode('/', $argv) : []);
+		} else
+			$argv = $argv ?? array_slice(self::argv(), 1);
+
 		$class = $namespace;
 		for ($i = 0; $i <= count($argv); $i++) {
 			if (class_exists($found = $class.'\\Home')
-					|| class_exists($found = $class.'Controller')) {
-				$args = array_slice($argv, $i);
-				if (($action = self::findRouteInClass($found, $method, $args)))
-					return [$found, $action, $args];
-			}
+					|| class_exists($found = $class.'Controller'))
+				if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
+					return $route;
 			if ($i < count($argv)) {
 				$class .= '\\'.self::classCase($argv[$i]);
 				if (class_exists($found = $class)
-						|| class_exists($found = $class.'Controller')) {
-					$args = array_slice($argv, $i + 1);
-					if (($action = self::findRouteInClass($found, $method, $args)))
-						return [$found, $action, $args];
-				}
+						|| class_exists($found = $class.'Controller'))
+					if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i + 1))))
+						return $route;
 			}
 		}
 
@@ -94,30 +75,47 @@ class Controller {
 	}
 
 	/**
-	 * Tries to find an action within a specific class that fits in with the request's arguments
+	 * Tries to find a route within a class that fits in with the request's arguments
 	 * @param string $classname The class in question
 	 * @param string $method HTTP method
 	 * @param string[] $args The request's arguments
-	 * @return string|null The action (function) name
+	 * @return string[]|null The action (function) name
 	 */
-	public static function findRouteInClass($classname, $method, &$args) {
+	public static function findRouteInClass($classname, $method, $args) {
 		$method = strtolower($method);
-		// action || methodAction
-		if (method_exists($classname, $fn = self::actionCase($method, @$args[0] ?: 'index'))
-				|| method_exists($classname, $fn = self::actionCase('', @$args[0] ?: 'index'))) {
-			array_splice($args, 0, 1);
-			return $fn;
-		// resource/action || resource/methodAction
-		} else if (count($args) >= 2
+		$count = count($args);
+
+		// index or methodIndex
+		if ($count == 0
+			&& (method_exists($classname, $fn = "{$method}Index")
+					|| method_exists($classname, $fn = 'index')))
+			$route = [$classname, $fn, []];
+
+		// action or methodAction
+		else if ($count > 0
+			&& (method_exists($classname, $fn = self::actionCase($method, $args[0]))
+					|| method_exists($classname, $fn = self::actionCase('', $args[0]))))
+			$route = [$classname, $fn, array_slice($args, 1)];
+
+		// resource+action or resource+methodAction
+		else if ($count >= 2
 				&& (method_exists($classname, $fn = self::actionCase($method, $args[1]))
 						|| method_exists($classname, $fn = self::actionCase('', $args[1])))) {
 			array_splice($args, 1, 1);
-			return $fn;
+			$route = [$classname, $fn, $args];
+
 		// resource
-		} else if (count($args) >= 1 && method_exists($classname, $fn = $method)) {
-			return $fn;
-		} else
-			return null;
+		} else if (method_exists($classname, $fn = $method))
+			$route = [$classname, $fn, $args];
+
+		if (isset($route)) {
+			$r = new \ReflectionClass($classname);
+			$m = $r->getMethod($route[1]);
+			if ($m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
+				return $route;
+		}
+
+		return null;
 	}
 
 	/**
@@ -200,7 +198,7 @@ class Controller {
 	 * Sets the ETag header and triggers 304 response if ETags match
 	 * @param string $etag The ETag value
 	 */
-	protected function setETag($etag) {
+	protected static function setETag($etag) {
 		if (($before = $_SERVER['HTTP_IF_NONE_MATCH'] ?? ''))
 			if ($before == $etag) {
 				http_response_code(304); // 304 Not Modified
