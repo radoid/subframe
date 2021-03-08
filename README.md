@@ -53,13 +53,11 @@ Your application will typically have many routes. A convention of ours is, when 
 
 In practice, your application will be by far bigger, and you may want to structure your controllers out into classes and their methods, which are here called "actions". You can still dispatch requests via multiple `Controller::route()` calls, specifying classes and methods instead of simple functions like above, but there are alternative ways, explained below. You can also combine those approaches together, by trying them out one after another, since the convention is to stop execution after an appropriate route is found.
 
-If your routes reside as methods (actions) in the same class (controller), you can use `Controller::dispatchInClass()`.
+If your routes reside in multiple classes in the same directory, you can use `Controller::routeInDirectory()`. In this case, you can structure your controllers further across subdirectories.
 
-If your routes reside in multiple classes in the same directory, you can use `Controller::dispatchInDirectory()`. In this case, you can structure your controllers further across subdirectories.
+If you use namespaces to structure out the controllers, possibly also across subdirectories, you can use `Controller::routeInNamespace()`.
 
-If you use namespaces to structure out the controllers, possibly also across subdirectories, you can use `Controller::dispatchInNamespace()`.
-
-Within the controllers, each action should be put into its own class method. Our convention is that the first part of the URI, when split into components at slashes, determines the controller's name and the second part the action's name. If there is no second part, the action is, by convention, "index", and if there is no first part either, the controller is "home". Next, actions should be prepended with the request's verb/method and written in lower camel case. Controller classes are written in upper camel case. For example:
+Within the controllers, each action should be put into its own class method. The convention here is that the first part of the URI, when split into components at slashes, determines the controller's name and the second part the action's name. If there is no second part, the action is, by convention, "index", and if there is no first part either, the controller is "home". Next, actions should be prepended with the request's verb/method and written in lower camel case. Controller classes are written in upper camel case. For example:
 
 	class Home {
 		function getIndex() {  // represents a GET request to the homepage

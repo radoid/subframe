@@ -141,6 +141,12 @@ class Model {
 	public const KEY = 'id';
 
 	/**
+	 * Default column used for sorting
+	 * @var string
+	 */
+	public const ORDER = 'id';
+
+	/**
 	 * Represents NULL value in the database
 	 */
 	public const Null = NAN;
@@ -180,9 +186,9 @@ class Model {
 
 	/**
 	 * Updates the record(s) in the DB table, found by the ID(s) from the optional parameter or the object itself
-	 * @param string|string[]|null $id The value looked up in the key column
+	 * @param string|string[] $id Optional value looked up in the key column
 	 */
-	public function update($id = null) {
+	public function update($id = '') {
 		$id = (isset($id) ? $id : $this->{static::KEY});
 		$sql = strval($this);
 		if (is_array($id) && !$id || !$sql)
@@ -342,7 +348,7 @@ class Model {
 
 	/**
 	 * Escapes and quotes a string
-	 * @param string $str
+	 * @param string|string[] $str
 	 * @return string
 	 */
 	public static function quote($str) {
