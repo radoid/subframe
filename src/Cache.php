@@ -14,7 +14,7 @@ class Cache {
 	protected $directory;
 
 	/**
-	 * Default expiry time in seconds
+	 * Default duration in seconds
 	 * @var int
 	 */
 	protected $ttl;
@@ -22,7 +22,7 @@ class Cache {
 	/**
 	 * The constructor
 	 * @param string $directory Storage directory
-	 * @param int $ttl Default expiry time in seconds
+	 * @param int $ttl Default duration in seconds
 	 */
 	public function __construct($directory, $ttl = 86400) {
 		$this->directory = rtrim($directory, "/") . "/";
@@ -57,7 +57,7 @@ class Cache {
 	 * Stores the item under the filename
 	 * @param string $name
 	 * @param string $content
-	 * @param int $ttl Expiry time in seconds, or default time will be used
+	 * @param int $ttl Duration in seconds, or default time will be used
 	 * @return bool true on success or false on failure
 	 */
 	public function put($name, $content, $ttl = 0) {
@@ -98,10 +98,21 @@ class Cache {
 		return true;
 	}
 
-	/** Stores the value of any type, serialized
+	/**
+	 * Returns the item's expiry time (Unix timestamp)
+	 * @param string $name
+	 * @return int|bool Timestamp or false on failure
+	 */
+	public function getTime($name) {
+		$mtime = @filemtime($this->directory.$name);
+		return $mtime;
+	}
+
+	/**
+	 * Stores the value of any type, serialized
 	 * @param string $name
 	 * @param string $data
-	 * @param int $ttl Expiry time in seconds, or default time will be used
+	 * @param int $ttl Optional duration in seconds, or default duration will be used
 	 * @return bool true on success or false on failure
 	 */
 	public function serialize($name, $data, $ttl = 0) {

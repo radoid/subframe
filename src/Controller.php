@@ -15,7 +15,6 @@ class Controller {
 	 * @param Cache $cache Optional cache if caching is desired
 	 */
 	public static function routeInNamespace($namespace = '', array $classArgs = [], $argv = null, $cache = null) {
-		$argv = (is_string($argv) ? explode('/', trim($argv, '/')) : $argv ?? array_slice(self::argv(), 1));
 		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 		if (($route = self::findRouteInNamespace($namespace, $method, $argv))) {
@@ -129,6 +128,8 @@ class Controller {
 
 		$cachename = ($cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output".str_replace("/", "-", $_SERVER['REQUEST_URI']).".html$gzip" : false);
 		if ($cachename) {
+			self::setETag(md5($cachename.$cache->getTime($cachename)));
+
 			if (!empty ($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
 				if ($cache->has($cachename, strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']))) {
 					header_remove();
