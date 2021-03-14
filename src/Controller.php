@@ -55,18 +55,19 @@ class Controller {
 	public static function findRouteInNamespace($namespace, $method, $requestUri = '') {
 		$requestUri = trim($requestUri !== '' ? $requestUri : self::getRequestUri(), '/');
 		$argv = ($requestUri !== '' ? explode('/', $requestUri) : []);
+		$argc = count($argv);
 
-		$class = $namespace;
-		for ($i = 0; $i <= count($argv); $i++) {
+		$classv = [$namespace];
+		for ($i = 0; $i < $argc; $classv[] = self::classCase($argv[$i++]));
+		for ($i = $argc; $i >= 0; $i--) {
+			$class = join('\\', array_slice($classv, 0, 1+$i));
 			if (class_exists($found = $class.'\\Home'))
 				if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
 					return $route;
-			if ($i < count($argv)) {
-				$class .= '\\'.self::classCase($argv[$i]);
+			if ($i > 0)
 				if (class_exists($found = $class))
-					if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i + 1))))
+					if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
 						return $route;
-			}
 		}
 
 		return null;
