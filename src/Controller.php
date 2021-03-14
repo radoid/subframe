@@ -11,13 +11,13 @@ class Controller {
 	 * Tries to dispatch the request within a namespace
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @param string[]|null $argv Optional arguments list; taken from the actual request if absent
+	 * @param string[]|null $requestUri Optional arguments list; taken from the actual request if absent
 	 * @param Cache $cache Optional cache if caching is desired
 	 */
-	public static function routeInNamespace($namespace = '', array $classArgs = [], $argv = null, $cache = null) {
+	public static function routeInNamespace($namespace = '', array $classArgs = [], $requestUri = '', $cache = null) {
 		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-		if (($route = self::findRouteInNamespace($namespace, $method, $argv))) {
+		if (($route = self::findRouteInNamespace($namespace, $method, $requestUri))) {
 			[$class, $action, $args] = $route;
 			$instance = new $class(...$classArgs);
 			self::dispatch([$instance, $action], $args, $cache);
@@ -30,10 +30,14 @@ class Controller {
 	 * @param string $uri The URI for the route
 	 * @param callable $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @param string $requestUri
 	 * @param Cache $cache Optional cache if caching is desired
 	 */
-	public static function route($method, $uri, $callable, array $classArgs = [], $cache = null) {
-		if ($method == $_SERVER['REQUEST_METHOD'] && preg_match("~^$uri/*$~", $_SERVER['REQUEST_URI'], $matches)) {
+	public static function route($method, $uri, $callable, array $classArgs = [], $requestUri = '', $cache = null) {
+		$requestUri = ($requestUri !== '' ? $requestUri : self::getRequestUri());
+		$uri = trim($uri, '/');
+
+		if ($method == $_SERVER['REQUEST_METHOD'] && preg_match("~^/$uri/*$~", $requestUri, $matches)) {
 			if (is_array($callable) && is_string($callable[0]))
 				$callable[0] = new $callable[0](...$classArgs);
 			$args = array_slice($matches, 1);
@@ -45,26 +49,21 @@ class Controller {
 	 * Tries to find a route within a namespace
 	 * @param string $namespace
 	 * @param string $method HTTP method
-	 * @param null $argv
+	 * @param string $requestUri
 	 * @return array|null
 	 */
-	public static function findRouteInNamespace($namespace, $method, $argv = null) {
-		if (is_string($argv)) {
-			$argv = trim($argv, '/');
-			$argv = ($argv !== '' ? explode('/', $argv) : []);
-		} else
-			$argv = $argv ?? array_slice(self::argv(), 1);
+	public static function findRouteInNamespace($namespace, $method, $requestUri = '') {
+		$requestUri = trim($requestUri !== '' ? $requestUri : self::getRequestUri(), '/');
+		$argv = ($requestUri !== '' ? explode('/', $requestUri) : []);
 
 		$class = $namespace;
 		for ($i = 0; $i <= count($argv); $i++) {
-			if (class_exists($found = $class.'\\Home')
-					|| class_exists($found = $class.'Controller'))
+			if (class_exists($found = $class.'\\Home'))
 				if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
 					return $route;
 			if ($i < count($argv)) {
 				$class .= '\\'.self::classCase($argv[$i]);
-				if (class_exists($found = $class)
-						|| class_exists($found = $class.'Controller'))
+				if (class_exists($found = $class))
 					if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i + 1))))
 						return $route;
 			}
@@ -185,14 +184,19 @@ class Controller {
 	}
 
 	/**
-	 * Obtains the current request's argument vector
-	 * @return array The array with the arguments
+	 * Obtains the current request URI
+	 * @return string
 	 */
-	private static function argv() {
+	private static function getRequestUri() {
 		global $argv;
-		$uri = $_SERVER['REQUEST_URI'] ?? '';
-		$uri = substr($uri, 0, strcspn($uri, '?'));
-		return ($uri ? explode('/', rtrim($uri, '/')) : ($argv ?? []));
+		if (isset($_SERVER['REQUEST_URI'])) {
+			//$uri = $_SERVER['PATH_INFO'] ?? '/';
+			$uri = $_SERVER['REQUEST_URI'] ?? '';
+			$uri = substr($uri, 0, strcspn($uri, '?'));
+		} else
+			$uri = '/'.join('/', array_slice($argv, 1));
+
+		return $uri;
 	}
 
 	/**
