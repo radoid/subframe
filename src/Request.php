@@ -322,4 +322,17 @@ class Request {
 		return $agent;
 	}
 
+	/**
+	 * Changes the path according to replacement rules, written as regular expressions
+	 */
+	public function rewrite(array $rules): self {
+		foreach ($rules as $pattern => $replacement)
+			if (($path = preg_replace("#^(?:$pattern)$#i", $replacement, $this->path)) != $this->path) {
+				$this->path = '/' . trim($path, '/');
+				break;
+			}
+
+		return $this;
+	}
+
 }
