@@ -1,9 +1,6 @@
 <?php
 namespace Subframe;
 
-use Closure;
-use Throwable;
-
 /**
  * Implements a simple HTTP cache
  * @package Subframe
@@ -18,7 +15,7 @@ class Accelerator {
 	/**
 	 * Paths to include in the cache or exclude, as regular expressions
 	 */
-	private string $includePath, $excludePath;
+	private ?string $includePath, $excludePath;
 
 
 	/**
@@ -31,74 +28,47 @@ class Accelerator {
 	}
 
 	/**
-	 * Handles the request represented by the global constants REQUEST_METHOD and REQUEST_URI or REDIRECT_URL
-	 */
-	public function handleGlobalRequestUri(callable $next): void {
-		$request = Request::fromGlobalRequestUri();
-
-		$this->handle($request, $next);
-	}
-
-	/**
 	 * Handles the given request. If the response is already in the cache, it is served. Otherwise, a callable is called
 	 * that should output a response and set response headers, typically using a router to dispatch the request.
 	 */
-	public function handle(Request $request, callable $next): void {
+	public function handle(Request $request, callable $next): ?Response {
 		$path = $request->getPath();
 		$isCachable = ($request->getMethod() == 'GET')
 				&& (isset($this->includePath) ?  preg_match("#$this->includePath#", $path) : true)
 				&& (isset($this->excludePath) ? !preg_match("#$this->excludePath#", $path) : true);
 		$acceptsGzip = (strpos($request->getHeader('Accept-Encoding') ?? '', 'gzip') !== false && extension_loaded('zlib'));
-		$filename = 'output' . strtr($request->getPathAndQueryString(), '/?&.', '----') . '.html' . ($acceptsGzip ? '.gz' : '');
-		$timestamp = time();
+		$filename = 'response' . strtr($request->getPathAndQueryString(), '/?&.', '----') . ($acceptsGzip ? '-gz' : '');
 
 		if ($isCachable) {
-			if (($before = $request->getHeader('If-None-Match')))
-				if ($before == $this->generateETag($filename, $this->cache->getExpiryTime($filename))) {
-					http_response_code(304); // 304 Not Modified
-					exit;
-				}
+			if (($content = $this->cache->get($filename)))
+				$content = unserialize($content);
 
-			if (($content = $this->cache->get($filename))) {
-				header('ETag: ' . $this->generateETag($filename, $this->cache->getExpiryTime($filename)));
-				header('Vary: Accept-Encoding');
-				if ($acceptsGzip) {
-					ini_set('zlib.output_compression', false);
-					header('Content-Encoding: gzip');
-				}
-				echo $content;
-				exit;
+			if ($content instanceof Response) {
+				if (($before = $request->getHeader('If-None-Match')))
+					if ($content->getHeader('ETag') == $before)
+						return new Response('', 304);
+
+				return $content;
 			}
-
-			header('ETag: ' . $this->generateETag($filename, $timestamp + $this->cache->getLifetime()));
-			header('Vary: Accept-Encoding');
 		}
 
-		ob_start();
-		try {
-			$result = $next($request);
-		} catch (Throwable $e) {
-			$result = $e;
-		}
-		$output = ob_get_flush();
-		$headers = headers_list();
+		/** @var ?Response */
+		$response = $next($request);
 
-		if ($result instanceof Throwable)
-			throw $result;
+		if ($isCachable && $response) {
+			$isCompressible = !$response->getHeader('Content-Encoding')
+					&& strpos($response->getHeader('Content-Type') ?? 'text/html', 'text/') === 0;
+			if ($isCompressible && $acceptsGzip) {
+				$body = gzencode($response->getBody());
+				$response->setBody($body);
+				$response->addHeader('Content-Encoding: gzip');
+				$response->addHeader('Content-Length: ' . strlen($body));
+			}
+			$response->addHeader('ETag: ' . uniqid());
+			$this->cache->set($filename, serialize($response));
+		}
 		
-		$isText = array_reduce($headers, fn ($isText, $header) => $isText || stripos($header, 'Content-Type: text/') === 0, false);
-		if ($isCachable && $isText && strlen($output))
-			$this->cache->set($filename, $acceptsGzip ? gzencode($output) : $output);
-	}
-
-	/**
-	 * Generates ETag for a specific file in the cache with an expiry timestamp
-	 * @param string $filename 
-	 * @param int $timestamp 
-	 * @return string 
-	 */
-	protected function generateETag(string $filename, int $timestamp): string {
-		return md5($filename . $timestamp);
+		return $response;
 	}
 
 }

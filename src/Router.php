@@ -28,12 +28,25 @@ class Router {
 	 * Adds a route defined with a regular expression and a callable
 	 * @param string $method The route's method
 	 * @param string $path The route's path, without trailing slash or query parameters
-	 * @param callable $callable The callable to be executed
+	 * @param callable|array $callable The callable to be executed
 	 * @param array $classArgs In case a class needs to be instantiated for the callable, the arguments for its constructor
 	 * @return self The object itself
 	 */
 	public function addRoute(string $method, string $path, $callable, array $classArgs = []): self {
 		$this->routes[] = [$method, $path, $callable, $classArgs];
+
+		return $this;
+	}
+
+	/**
+	 * Adds a view route, only presenting the given view
+	 * @param string $path The route's path, without trailing slash or query parameters
+	 * @param string $filename The view's filename
+	 * @param array $data Optional data for the view
+	 * @return self The object itself
+	 */
+	public function addView(string $path, string $filename, array $data = []): self {
+		$this->routes[] = [null, $path, $filename, $data];
 
 		return $this;
 	}
@@ -52,38 +65,54 @@ class Router {
 
 	/**
 	 * Tries to dispatch the given request among its routes
-	 * @param Request The incoming request
-	 * @return bool true if a route was found and executed, otherwise false
+	 * @param Request $request The incoming request
+	 * @return ?Response The response if a route was found and executed, otherwise null
 	 */
-	public function dispatch(Request $request): bool {
+	public function dispatch(Request $request): ?Response {
 		Container::set(Request::class, $request);
 		
-		foreach ($this->routes as [$method, $path, $action, $classArgs]) {
+		foreach ($this->routes as [$method, $path, $action, $data]) {
 			if ($method)
-				$route = $this->matchRoute($request, $method, $path, $action, $classArgs);
+				$route = $this->matchRoute($request, $method, $path, $action, $data);
+			elseif ($path !== null)
+				$route = $this->matchView($request, $path, $action, $data);
 			else
-				$route = $this->matchNamespace($request, $action, $classArgs);
+				$route = $this->matchNamespace($request, $action, $data);
 			
 			if ($route) {
-				[$callable, $args, $classArgs] = $route;
-				Container::call($callable, $args ?? [], $classArgs ?? []);
-				return true;
+				$response = $this->captureResponse($route);
+				return $response;
 			}
 		}
 
-		return false;
+		return null;
 	}
 
 	/**
-	 * Tries to match a regular expression route to the given request
+	 * Tries to match a view-route to the request
+	 * @param Request $request The request
+	 * @param string $path The route's path, without trailing slash or query parameters
+	 * @param string $filename The view's filename
+	 * @param array $data Optional data for the view
+	 * @return ?array The "route" containing a callable that returns the view as a Response
+	 */
+	public function matchView(Request $request, string $path, string $filename, array $data = []): ?array {
+		if ($request->getMethod() == 'GET' && $path == $request->getPath())
+			return [fn() => Response::fromView($filename, $data)];
+
+		return null;
+	}
+
+	/**
+	 * Tries to match a regular expression route to the request
 	 * @param Request $request The request
 	 * @param string $method The route's method
 	 * @param string $path The route's path, without trailing slash or query parameters
 	 * @param callable|string $callable A closure or [Controller, action] combination
 	 * @param array $classArgs In case a class needs to be instantiated for the callable, the arguments for its constructor
-	 * @return ?array An array [callable, args] representing a route
+	 * @return ?array The "route" containing a callable and its arguments
 	 */
-	private function matchRoute(Request $request, string $method, string $path, $callable, array $classArgs = []): ?array {
+	public function matchRoute(Request $request, string $method, string $path, $callable, array $classArgs = []): ?array {
 		if ($method == $request->getMethod() && preg_match("~^$path$~", $request->getPath(), $matches))
 			return [$callable, array_slice($matches, 1), $classArgs];
 
@@ -91,13 +120,13 @@ class Router {
 	}
 
 	/**
-	 * Tries to match the given namespace to the request
+	 * Tries to match the given namespace of routes to the request
 	 * @param Request $request The request
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments for the instantiated class constructor
 	 * @return ?array An array [callable, args] representing the route
 	 */
-	private function matchNamespace(Request $request, string $namespace, array $classArgs = []): ?array {
+	public function matchNamespace(Request $request, string $namespace, array $classArgs = []): ?array {
 		$method = $request->getMethod();
 		$path = trim($request->getPath(), '/');
 		$argv = ($path !== '' ? explode('/', $path) : []);
@@ -127,7 +156,7 @@ class Router {
 	 * @param array $classArgs Optional arguments for the class' constructor
 	 * @return ?array An array [callable, args] representing the route
 	 */
-	private function matchClass(string $class, string $requestMethod, array $args, array $classArgs = []): ?array {
+	public function matchClass(string $class, string $requestMethod, array $args, array $classArgs = []): ?array {
 		$requestMethod = strtolower($requestMethod);
 		$count = count($args);
 
@@ -160,6 +189,28 @@ class Router {
 			return $route;
 
 		return null;
+	}
+
+	/**
+	 * Makes a call to the controller and encapsulates the response into a Response object if it isn't one
+	 * @param mixed $route The "route" representing the controller
+	 * @return ?Response The Response object
+	 */
+	private function captureResponse(array $route): Response {
+		$response = Container::call($route[0], $route[1] ?? [], $route[2] ?? []);
+
+		if (!($response instanceof Response)) {
+			$status = http_response_code();
+			
+			if (is_string($response))
+				$response = new Response($response, $status, []);
+			elseif (is_array($response) || is_object($response))
+				$response = Response::fromJson($response, $status);
+			else
+				$response = new Response('', $status, []);
+		}
+
+		return $response;
 	}
 
 	/**
