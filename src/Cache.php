@@ -61,16 +61,11 @@ class Cache {
 	 * @return bool true on success or false on failure
 	 */
 	public function put($name, $content, $ttl = 0) {
-		if (!($f = fopen($path = $this->directory.$name, "w")))
-			return false;
-		flock($f, LOCK_EX);
-		$success = fwrite($f, $content);
-		flock($f, LOCK_UN);
-		fclose($f);
-		@chmod($path, 0666);
-		if ($success)
+		$path = $this->directory.$name;
+		$isDone = file_put_contents($path, $content, LOCK_EX);
+		if ($isDone)
 			@touch($path, time() + ($ttl ? $ttl : $this->ttl));
-		return true;
+		return $isDone;
 	}
 
 	/**
