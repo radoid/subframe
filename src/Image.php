@@ -35,6 +35,8 @@ class Image {
 			$image_before = imagecreatefrompng($source);
 		elseif ($type == IMAGETYPE_BMP || $type == IMAGETYPE_WBMP)
 			$image_before = imagecreatefromwbmp($source);
+		elseif ($type == IMAGETYPE_WEBP)
+			$image_before = imagecreatefromwebp($source);
 		else
 			$image_before = imagecreatefromjpeg($source);
 		if (!$image_before)
