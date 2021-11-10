@@ -10,54 +10,54 @@ class Image {
 	/**
 	 * Takes an image or part of it and saves it in another size, optionally rotated too
 	 * @param $source
-	 * @param $src_x
-	 * @param $src_y
-	 * @param $src_w
-	 * @param $src_h
-	 * @param $dst_w
-	 * @param $dst_h
+	 * @param $srcX
+	 * @param $srcY
+	 * @param $srcWidth
+	 * @param $srcHeight
+	 * @param $destWidth
+	 * @param $destHeight
 	 * @param string $destination
-	 * @param int $destinationtype
+	 * @param int $destinationType
 	 * @param int $rotation
 	 * @return string destination path or false in case of an error
 	 */
-	static function resample($source, $src_x, $src_y, $src_w, $src_h, $dst_w, $dst_h, $destination = '', $destinationtype = 0, $rotation = 0) {
-		list ($initialwidth, $initialheight, $type) = @getimagesize($source);
-		if (!$initialwidth || !$initialheight || !$type)
+	static function resample($source, $srcX, $srcY, $srcWidth, $srcHeight, $destWidth, $destHeight, $destination = '', $destinationType = 0, $rotation = 0) {
+		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
+		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 
 		ini_set('memory_limit', '256M');
 		ini_set('gd.jpeg_ignore_warning', 1);
 
 		if ($type == IMAGETYPE_GIF)
-			$image_before = imagecreatefromgif($source);
+			$imageBefore = imagecreatefromgif($source);
 		elseif ($type == IMAGETYPE_PNG)
-			$image_before = imagecreatefrompng($source);
+			$imageBefore = imagecreatefrompng($source);
 		elseif ($type == IMAGETYPE_BMP || $type == IMAGETYPE_WBMP)
-			$image_before = imagecreatefromwbmp($source);
+			$imageBefore = imagecreatefromwbmp($source);
 		elseif ($type == IMAGETYPE_WEBP)
-			$image_before = imagecreatefromwebp($source);
+			$imageBefore = imagecreatefromwebp($source);
 		else
-			$image_before = imagecreatefromjpeg($source);
-		if (!$image_before)
+			$imageBefore = imagecreatefromjpeg($source);
+		if (!$imageBefore)
 			return false;
 
-		if (!($image_after = imagecreatetruecolor($dst_w, $dst_h)))
+		if (!($imageAfter = imagecreatetruecolor($destWidth, $destHeight)))
 			return false;
-		if (!imagecopyresampled($image_after, $image_before, 0, 0, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h))
+		if (!imagecopyresampled($imageAfter, $imageBefore, 0, 0, $srcX, $srcY, $destWidth, $destHeight, $srcWidth, $srcHeight))
 			return false;
 
 		if ($rotation)
-			$image_after = imagerotate($image_after, $rotation, 0);
+			$imageAfter = imagerotate($imageAfter, $rotation, 0);
 
 		$destination = ($destination ?: $source);
-		$destinationtype = ($destinationtype ?: $type);
-		if ($destinationtype == IMAGETYPE_GIF)
-			$success = imagegif($image_after, $destination);
-		elseif ($destinationtype == IMAGETYPE_PNG)
-			$success = imagepng($image_after, $destination);
+		$destinationType = ($destinationType ?: $type);
+		if ($destinationType == IMAGETYPE_GIF)
+			$success = imagegif($imageAfter, $destination);
+		elseif ($destinationType == IMAGETYPE_PNG)
+			$success = imagepng($imageAfter, $destination);
 		else
-			$success = imagejpeg($image_after, $destination, 98);
+			$success = imagejpeg($imageAfter, $destination, 98);
 		if (!$success)
 			return false;
 
@@ -67,45 +67,47 @@ class Image {
 	/**
 	 * Ensures the image doesn't exceed the given size
 	 * @param $source
-	 * @param $maxwidth
-	 * @param $maxheight
+	 * @param $maxWidth
+	 * @param $maxHeight
 	 * @param string $destination
-	 * @param int $destinationtype
+	 * @param int $destinationType
 	 * @param bool $canCrop
 	 * @return string destination path or false in case of an error
 	 */
-	static function constrain($source, $maxwidth, $maxheight, $destination = '', $destinationtype = 0, $canCrop = false) {
-		list ($initialwidth, $initialheight, $type) = @getimagesize($source);
-		if (!$initialwidth || !$initialheight || !$type)
+	static function constrain($source, $maxWidth, $maxHeight, $destination = '', $destinationType = 0, $canCrop = false) {
+		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
+		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 
 		$rotation = (function_exists('exif_read_data') && ($exif = @exif_read_data($source)) && ($orientation = @$exif['Orientation']) ?
 						($orientation == 8 ? 90 : ($orientation == 3 ? 180 : ($orientation == 6 ? -90 : 0))) : 0);
 		if ($rotation == 90 || $rotation == -90)
-			list($maxwidth, $maxheight) = [$maxheight, $maxwidth];
+			list($maxWidth, $maxHeight) = [$maxHeight, $maxWidth];
 
-		if ($initialwidth <= $maxwidth && $initialheight <= $maxheight && !$destinationtype)
+		if ($initialWidth <= $maxWidth && $initialHeight <= $maxHeight  // if the file doesn't change
+				&& (!$destinationType || $destinationType == $type)
+				&& (!$destination || $destination == $source))
 			return $source;
 
 		if ($canCrop) {  // take only the center part to fit new dimensions
-			$dst_w = $maxwidth;
-			$dst_h = $maxheight;
-			$factor = max($dst_w / $initialwidth, $dst_h / $initialheight);
-			$src_w = $dst_w / $factor;
-			$src_h = $dst_h / $factor;
-			$src_x = ($initialwidth - $src_w) / 2;
-			$src_y = ($initialheight - $src_h) / 2;
+			$destWidth = $maxWidth;
+			$destHeight = $maxHeight;
+			$scale = max($destWidth / $initialWidth, $destHeight / $initialHeight);
+			$srcWidth = $destWidth / $scale;
+			$srcHeight = $destHeight / $scale;
+			$srcX = ($initialWidth - $srcWidth) / 2;
+			$srcY = ($initialHeight - $srcHeight) / 2;
 		} else {  // all of the image must fit into the new dimensions
-			$factor = min(min($initialwidth, $maxwidth) / $initialwidth, min($initialheight, $maxheight) / $initialheight);
-			$dst_w = $initialwidth * $factor;
-			$dst_h = $initialheight * $factor;
-			$src_w = $initialwidth;
-			$src_h = $initialheight;
-			$src_x = 0;
-			$src_y = 0;
+			$scale = min(min($initialWidth, $maxWidth) / $initialWidth, min($initialHeight, $maxHeight) / $initialHeight);
+			$destWidth = $initialWidth * $scale;
+			$destHeight = $initialHeight * $scale;
+			$srcWidth = $initialWidth;
+			$srcHeight = $initialHeight;
+			$srcX = 0;
+			$srcY = 0;
 		}
 
-		return self::resample($source, $src_x, $src_y, $src_w, $src_h, $dst_w, $dst_h, $destination, $destinationtype, $rotation);
+		return self::resample($source, $srcX, $srcY, $srcWidth, $srcHeight, $destWidth, $destHeight, $destination, $destinationType, $rotation);
 	}
 
 	/**
@@ -113,39 +115,39 @@ class Image {
 	 * @param $source
 	 * @param $angle
 	 * @param string $destination
-	 * @param int $destinationtype
+	 * @param int $destinationType
 	 * @return bool|string
 	 */
-	static function rotate($source, $angle, $destination = '', $destinationtype = 0) {
-		list ($initialwidth, $initialheight, $type) = @getimagesize($source);
-		if (!$initialwidth || !$initialheight || !$type)
+	static function rotate($source, $angle, $destination = '', $destinationType = 0) {
+		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
+		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 
 		ini_set("memory_limit", "256M");
 		ini_set('gd.jpeg_ignore_warning', 1);
 
 		if ($type == IMAGETYPE_GIF)
-			$image_before = imagecreatefromgif($source);
+			$imageBefore = imagecreatefromgif($source);
 		elseif ($type == IMAGETYPE_PNG)
-			$image_before = imagecreatefrompng($source);
+			$imageBefore = imagecreatefrompng($source);
 		elseif ($type == IMAGETYPE_BMP || $type == IMAGETYPE_WBMP)
-			$image_before = imagecreatefromwbmp($source);
+			$imageBefore = imagecreatefromwbmp($source);
 		else
-			$image_before = imagecreatefromjpeg($source);
-		if (!$image_before)
+			$imageBefore = imagecreatefromjpeg($source);
+		if (!$imageBefore)
 			return false;
 
-		if (!($image_after = imagerotate($image_before, $angle, 0)))
+		if (!($imageAfter = imagerotate($imageBefore, $angle, 0)))
 			return false;
 
 		$destination = ($destination ?: $source);
-		$destinationtype = ($destinationtype ?: $type);
-		if ($destinationtype == IMAGETYPE_GIF)
-			$success = imagegif($image_after, $destination);
-		elseif ($destinationtype == IMAGETYPE_PNG)
-			$success = imagepng($image_after, $destination);
+		$destinationType = ($destinationType ?: $type);
+		if ($destinationType == IMAGETYPE_GIF)
+			$success = imagegif($imageAfter, $destination);
+		elseif ($destinationType == IMAGETYPE_PNG)
+			$success = imagepng($imageAfter, $destination);
 		else
-			$success = imagejpeg($image_after, $destination, 98);
+			$success = imagejpeg($imageAfter, $destination, 98);
 		if (!$success)
 			return false;
 
