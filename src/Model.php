@@ -37,11 +37,13 @@ class Model {
 	/**
 	 * Adds all fields from the given object/array to the actual object
 	 * @param array|object $data object or associative array with data
+	 * @param bool $force should null values be copied over
 	 * @return $this
 	 */
-	public function merge($data) {
+	public function merge($data, $force = false) {
 		foreach ($data as $key => $value)
-			$this->$key = $value;
+			if (isset($value) || $force)
+				$this->$key = $value;
 		return $this;
 	}
 
@@ -144,7 +146,7 @@ class Model {
 	 * Default column used for sorting
 	 * @var string
 	 */
-	public const ORDER = 'id';
+	public const ORDER = null;
 
 	/**
 	 * Represents NULL value in the database
@@ -279,7 +281,7 @@ class Model {
 	public static function fetch($q, array $params = null) {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q, $params);
-		return $q->fetchObject(static::class != 'Model' ? static::class : 'stdClass');
+		return $q->fetchObject(static::class != 'Subframe/Model' ? static::class : 'stdClass') ?: null;
 	}
 
 	/**
@@ -293,7 +295,7 @@ class Model {
 	public static function fetchAll($q, array $params = null, $indexColumn = '') {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q, $params);
-		$classname = (static::class != 'Model' ? static::class : 'stdClass');
+		$classname = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
 		if (!$indexColumn)
 			return $q->fetchAll(\PDO::FETCH_CLASS, $classname);
 		for ($objects = []; ($o = $q->fetchObject($classname)); $objects[$o->$indexColumn] = $o);
