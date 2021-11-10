@@ -94,6 +94,14 @@ class Cache {
 	}
 
 	/**
+	 * Deletes all expired items
+	 * @return bool true on success or false on failure
+	 */
+	public function purge() {
+		return $this->delete(false);
+	}
+
+	/**
 	 * Returns the item's expiry time (Unix timestamp)
 	 * @param string $name
 	 * @return int|bool Timestamp or false on failure
@@ -104,15 +112,38 @@ class Cache {
 	}
 
 	/**
+	 * Stores the value of any type, var_export-ed
+	 * @param string $name
+	 * @param mixed $data
+	 * @param int $ttl Optional duration in seconds, or default duration will be used
+	 * @return bool true on success or false on failure
+	 */
+	public function export($name, $data, $ttl = 0) {
+		$content = '<?php return '.var_export($data, true).';';
+		return $this->put("$name.php", $content, $ttl);
+	}
+
+	/**
+	 * Retrieves the var_export-ed data
+	 * @param string $name
+	 * @return bool|mixed The data, or false on error
+	 */
+	public function import($name) {
+		if (@filemtime($path = $this->directory.$name.'.php') >= time())
+			$data = @(include $path);
+		return isset($data) ? $data : false;
+	}
+
+	/**
 	 * Stores the value of any type, serialized
 	 * @param string $name
-	 * @param string $data
+	 * @param mixed $data
 	 * @param int $ttl Optional duration in seconds, or default duration will be used
 	 * @return bool true on success or false on failure
 	 */
 	public function serialize($name, $data, $ttl = 0) {
-		$content = var_export($data, true);
-		return $this->put("$name.php", $content, $ttl);
+		$content = serialize($data);
+		return $this->put($name, $content, $ttl);
 	}
 
 	/**
@@ -121,9 +152,9 @@ class Cache {
 	 * @return bool|mixed The data, or false on error
 	 */
 	public function unserialize($name) {
-		if (@filemtime($path = $this->directory.$name.'.php') >= time())
-			$data = @(include $path);
-		return isset($data) ? $data : false;
+		if (@filemtime($path = $this->directory.$name) >= time())
+			$data = $this->get($name);
+		return isset($data) ? unserialize($data) : false;
 	}
 
 	/**
@@ -131,7 +162,7 @@ class Cache {
 	 * @param string $name
 	 * @return bool
 	 */
-	public function hasSerialized($name) {
+	public function hasExported($name) {
 		return $this->has("$name.php");
 	}
 
