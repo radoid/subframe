@@ -19,11 +19,11 @@ class Router {
 
 	/**
 	 * The constructor
-	 * @param string $method HTTP method/verb
-	 * @param string $uri requested URI
+	 * @param string|null $method HTTP method/verb
+	 * @param string|null $uri requested URI
 	 * @param Cache|null $cache
 	 */
-	public function __construct(string $method, string $uri, Cache $cache = null) {
+	public function __construct(?string $method = null, ?string $uri = null, ?Cache $cache = null) {
 		$this->method = $method;
 		$this->uri = trim(strtok($uri, '?'), '/');
 		$this->cache = $cache;
@@ -61,7 +61,7 @@ class Router {
 	 */
 	public function routeInNamespace(string $namespace, array $classArgs = [], Cache $cache = null) {
 		if (($route = $this->findRouteInNamespace($namespace))) {
-			list($class, $action, $args) = $route;
+			[$class, $action, $args] = $route;
 			$instance = new $class(...$classArgs);
 			self::handleRoute([$instance, $action], $args, $cache ?? $this->cache);
 		}
@@ -76,7 +76,7 @@ class Router {
 	 * @param Cache|null $cache Optional cache if caching is desired
 	 * @return Router
 	 */
-	public function route(string $method, string $uri, $callable, array $classArgs = [], Cache $cache = null) {
+	public function route(string $method, string $uri, callable $callable, array $classArgs = [], ?Cache $cache = null): self {
 		$uri = trim($uri, '/');
 
 		if ($method == $this->method && preg_match("~^$uri$~", $this->uri, $matches)) {
@@ -96,7 +96,7 @@ class Router {
 	 * @param string $namespace
 	 * @return array|null
 	 */
-	public function findRouteInNamespace(string $namespace) {
+	public function findRouteInNamespace(string $namespace): ?array {
 		$argv = ($this->uri !== '' ? explode('/', $this->uri) : []);
 		$argc = count($argv);
 
@@ -123,7 +123,7 @@ class Router {
 	 * @param string[] $args The request's arguments
 	 * @return string[]|null The action (function) name
 	 */
-	public static function findRouteInClass(string $classname, string $method, array $args) {
+	public static function findRouteInClass(string $classname, string $method, array $args): ?array {
 		$method = strtolower($method);
 		$count = count($args);
 
@@ -230,7 +230,7 @@ class Router {
 	 * @param string $arg The argument
 	 * @return string The result
 	 */
-	private static function actionCase(string $method, string $arg) {
+	private static function actionCase(string $method, string $arg): string {
 		if (strpbrk($arg, '-.'))
 			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
 		return ($method ? $method.ucfirst($arg) : $arg);
@@ -240,7 +240,7 @@ class Router {
 	 * Obtains the current request URI
 	 * @return string
 	 */
-	public static function getRequestUri() {
+	public static function getRequestUri(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_METHOD'])) {
 			$uri = rawurldecode($_SERVER['REQUEST_URI'] ?? '/');

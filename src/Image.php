@@ -22,8 +22,8 @@ class Image {
 	 * @param int $quality
 	 * @return bool true if successful or false in case of an error
 	 */
-	static function resample($source, $srcX, $srcY, $srcWidth, $srcHeight, $destWidth, $destHeight, $destination = '', $destinationType = 0, $rotation = 0) {
-		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
+	static function resample(string $source, int $srcX, int $srcY, int $srcWidth, int $srcHeight, int $destWidth, int $destHeight, ?string $destination = null, ?int $destinationType = null, float $rotationAngle = 0, int $quality = 98): bool {
+		[$initialWidth, $initialHeight, $type] = @getimagesize($source);
 		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 
@@ -48,8 +48,8 @@ class Image {
 		if (!imagecopyresampled($imageAfter, $imageBefore, 0, 0, $srcX, $srcY, $destWidth, $destHeight, $srcWidth, $srcHeight))
 			return false;
 
-		if ($rotation)
-			$imageAfter = imagerotate($imageAfter, $rotation, 0);
+		if ($rotationAngle)
+			$imageAfter = imagerotate($imageAfter, $rotationAngle, 0);
 
 		$destination = ($destination ?: $source);
 		$destinationType = ($destinationType ?: $type);
@@ -58,7 +58,7 @@ class Image {
 		elseif ($destinationType == IMAGETYPE_PNG)
 			$isSuccess = imagepng($imageAfter, $destination);
 		else
-			$isSuccess = imagejpeg($imageAfter, $destination, 98);
+			$isSuccess = imagejpeg($imageAfter, $destination, $quality);
 
 		return $isSuccess;
 	}
@@ -74,15 +74,15 @@ class Image {
 	 * @param int $quality
 	 * @return bool true if successful or false in case of an error
 	 */
-	static function constrain($source, $maxWidth, $maxHeight, $destination = '', $destinationType = 0, $canCrop = false) {
-		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
+	static function constrain(string $source, int $maxWidth, int $maxHeight, ?string $destination = null, ?int $destinationType = null, bool $canCrop = false, int $quality = 98): bool {
+		[$initialWidth, $initialHeight, $type] = @getimagesize($source);
 		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 
-		$rotation = (function_exists('exif_read_data') && ($exif = @exif_read_data($source)) && ($orientation = @$exif['Orientation']) ?
+		$rotationAngle = (function_exists('exif_read_data') && ($exif = @exif_read_data($source)) && ($orientation = @$exif['Orientation']) ?
 						($orientation == 8 ? 90 : ($orientation == 3 ? 180 : ($orientation == 6 ? -90 : 0))) : 0);
-		if ($rotation == 90 || $rotation == -90)
-			list($maxWidth, $maxHeight) = [$maxHeight, $maxWidth];
+		if ($rotationAngle == 90 || $rotationAngle == -90)
+			[$maxWidth, $maxHeight] = [$maxHeight, $maxWidth];
 
 		if ($initialWidth <= $maxWidth && $initialHeight <= $maxHeight  // if the file doesn't change
 				&& (!$destinationType || $destinationType == $type)
@@ -107,7 +107,7 @@ class Image {
 			$srcY = 0;
 		}
 
-		return self::resample($source, $srcX, $srcY, $srcWidth, $srcHeight, $destWidth, $destHeight, $destination, $destinationType, $rotation);
+		return self::resample($source, $srcX, $srcY, $srcWidth, $srcHeight, $destWidth, $destHeight, $destination, $destinationType, $rotationAngle, $quality);
 	}
 
 	/**
@@ -116,10 +116,11 @@ class Image {
 	 * @param float $angle
 	 * @param string|null $destination
 	 * @param int $destinationType
-	 * @return bool|string
+	 * @param int $quality
+	 * @return bool true if successful or false in case of an error
 	 */
-	static function rotate($source, $angle, $destination = '', $destinationType = 0) {
-		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
+	static function rotate(string $source, float $angle, ?string $destination = null, ?int $destinationType = null, int $quality = 98): bool {
+		[$initialWidth, $initialHeight, $type] = @getimagesize($source);
 		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 

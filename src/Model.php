@@ -163,7 +163,7 @@ class Model {
 	 * Inserts the object into the DB table
 	 * @return string The insert ID
 	 */
-	public function insert() {
+	public function insert(): string {
 		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
 		self::$pdo->exec($sql);
 		return self::$pdo->lastInsertId();
@@ -225,7 +225,7 @@ class Model {
 	 * @return int
 	 * @throws \Exception
 	 */
-	public static function count() {
+	public static function count(): int {
 		$sql = "SELECT COUNT(*) FROM ".static::TABLE;
 		$count = self::result($sql);
 		return (int) $count;
@@ -237,7 +237,7 @@ class Model {
 	 * @return boolean
 	 * @throws \Exception
 	 */
-	public static function exists($id) {
+	public static function exists($id): bool {
 		$sql = "SELECT 1 FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).") LIMIT 1";
 		return !!self::result($sql);
 	}

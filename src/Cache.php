@@ -24,7 +24,7 @@ class Cache {
 	 * @param string $directory Storage directory
 	 * @param int $ttl Default duration in seconds
 	 */
-	public function __construct($directory, $ttl = 86400) {
+	public function __construct(string $directory, int $ttl = 86400) {
 		$this->directory = rtrim($directory, "/") . "/";
 		$this->ttl = $ttl;
 	}
@@ -32,10 +32,10 @@ class Cache {
 	/**
 	 * Checks whether an item exists in the cache and is still valid
 	 * @param string $name The file name of the item
-	 * @param int $lastModified Optional timestamp of the last modification (to also check whether the content is new, not just valid)
+	 * @param int|null $lastModified Optional timestamp of the last modification (to also check whether the content is new, not just valid)
 	 * @return bool
 	 */
-	public function has($name, $lastModified = 0) {
+	public function has(string $name, ?int $lastModified = null): bool {
 		if (@filemtime($this->directory.$name) > time())
 			if ($lastModified)
 				return ($lastModified >= @filectime($this->directory.$name));
@@ -49,7 +49,7 @@ class Cache {
 	 * @param string $name The file name with the content
 	 * @return int|boolean Number of bytes read/output, or false on error
 	 */
-	public function dump($name) {
+	public function dump(string $name) {
 		return readfile($this->directory.$name);
 	}
 
@@ -57,10 +57,10 @@ class Cache {
 	 * Stores the item under the filename
 	 * @param string $name
 	 * @param string $content
-	 * @param int $ttl Duration in seconds, or default time will be used
+	 * @param int|null $ttl Duration in seconds, or default time will be used
 	 * @return bool true on success or false on failure
 	 */
-	public function put($name, $content, $ttl = 0) {
+	public function put(string $name, string $content, ?int $ttl = null): bool {
 		$path = $this->directory.$name;
 		$isDone = file_put_contents($path, $content, LOCK_EX);
 		if ($isDone)
@@ -73,7 +73,7 @@ class Cache {
 	 * @param string $name The filename
 	 * @return string|null The content on success or null on failure or expiry
 	 */
-	public function get($name) {
+	public function get(string $name): ?string {
 		if (@filemtime($path = $this->directory.$name) >= time())
 			$content = file_get_contents($path);
 		return $content ?? null;
@@ -81,13 +81,13 @@ class Cache {
 
 	/**
 	 * Deletes all items having given prefix or being expired
-	 * @param string $prefix The prefix; empty string will catch all items
+	 * @param string|null $prefix The prefix; empty string will catch all items
 	 * @return bool true on success or false on failure
 	 */
-	public function delete($prefix = "") {
+	public function delete(?string $prefix = null): bool {
 		foreach (scandir($this->directory) as $filename)
 			if (is_file($this->directory . $filename))
-				if ($prefix === "" || ($prefix && strpos($filename, $prefix) === 0) || @filemtime($this->directory . $filename) < time())
+				if ($prefix === null || strpos($filename, $prefix) === 0 || @filemtime($this->directory . $filename) < time())
 					if (!@unlink($this->directory . $filename))
 						return false;
 		return true;
@@ -97,7 +97,7 @@ class Cache {
 	 * Deletes all expired items
 	 * @return bool true on success or false on failure
 	 */
-	public function purge() {
+	public function purge(): bool {
 		return $this->delete(false);
 	}
 
@@ -106,7 +106,7 @@ class Cache {
 	 * @param string $name
 	 * @return int|null Timestamp or null on failure
 	 */
-	public function getTime($name) {
+	public function getTime(string $name): ?int {
 		$mtime = @filemtime($this->directory.$name);
 
 		return $mtime ?? null;
@@ -119,7 +119,7 @@ class Cache {
 	 * @param int $ttl Optional duration in seconds, or default duration will be used
 	 * @return bool true on success or false on failure
 	 */
-	public function export($name, $data, $ttl = 0) {
+	public function export(string $name, $data, ?int $ttl = null): bool {
 		$content = '<?php return '.var_export($data, true).';';
 		return $this->put("$name.php", $content, $ttl);
 	}
@@ -129,7 +129,7 @@ class Cache {
 	 * @param string $name
 	 * @return mixed|null The data, or null on error
 	 */
-	public function import($name) {
+	public function import(string $name) {
 		if (@filemtime($path = $this->directory.$name.'.php') >= time())
 			$data = @(include $path);
 		return $data ?? null;
@@ -142,7 +142,7 @@ class Cache {
 	 * @param int $ttl Optional duration in seconds, or default duration will be used
 	 * @return bool true on success or false on failure
 	 */
-	public function serialize($name, $data, $ttl = 0) {
+	public function serialize(string $name, $data, ?int $ttl = null): bool {
 		$content = serialize($data);
 		return $this->put($name, $content, $ttl);
 	}
@@ -152,8 +152,8 @@ class Cache {
 	 * @param string $name
 	 * @return mixed|null The data, or null on error
 	 */
-	public function unserialize($name) {
-		if (@filemtime($path = $this->directory.$name) >= time())
+	public function unserialize(string $name) {
+		if (@filemtime($this->directory.$name) >= time())
 			$data = $this->get($name);
 		return isset($data) ? unserialize($data) : null;
 	}
@@ -163,7 +163,7 @@ class Cache {
 	 * @param string $name
 	 * @return bool
 	 */
-	public function hasExported($name) {
+	public function hasExported(string $name): bool {
 		return $this->has("$name.php");
 	}
 
