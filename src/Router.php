@@ -57,7 +57,7 @@ class Router {
 	 * Tries to dispatch the request within a namespace
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @param Cache $cache Optional cache if caching is desired
+	 * @param Cache|null $cache Optional cache if caching is desired
 	 */
 	public function routeInNamespace(string $namespace, array $classArgs = [], Cache $cache = null) {
 		if (($route = $this->findRouteInNamespace($namespace))) {
@@ -73,7 +73,7 @@ class Router {
 	 * @param string $uri The URI for the route
 	 * @param callable $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @param Cache $cache Optional cache if caching is desired
+	 * @param Cache|null $cache Optional cache if caching is desired
 	 * @return Router
 	 */
 	public function route(string $method, string $uri, $callable, array $classArgs = [], Cache $cache = null) {
@@ -150,12 +150,14 @@ class Router {
 		} else if (method_exists($classname, $fn = $method))
 			$route = [$classname, $fn, $args];
 
-		if (isset($route)) {
-			$r = new \ReflectionClass($classname);
-			$m = $r->getMethod($route[1]);
-			if ($m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
-				return $route;
-		}
+		if (isset($route))
+			try {
+				$r = new \ReflectionClass($classname);
+				$m = $r->getMethod($route[1]);
+				if ($m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
+					return $route;
+			}
+			catch (\Throwable $ignored) {}
 
 		return null;
 	}
@@ -164,7 +166,7 @@ class Router {
 	 * Dispatches the request to a callable
 	 * @param callable $callable
 	 * @param array $args
-	 * @param null $cache
+	 * @param Cache|null $cache
 	 */
 	private static function handleRoute(callable $callable, array $args, Cache $cache = null) {
 		$gzip = (strpos(@$_SERVER['HTTP_ACCEPT_ENCODING'], "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');

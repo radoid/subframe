@@ -31,7 +31,7 @@ class File {
 	 * Finds a unique file path, relative to a base directory, by appending a numeric suffix when needed..
 	 * Optionally, creates directories along the given path, if needed.
 	 * @param string $root The base directory
-	 * @param string $filepath The desired path to the file, relative to the base directory
+	 * @param string $uri The desired path to the file, relative to the base directory
 	 * @param int $mkdirMode Optional permissions for the directories, should they be created (if non-zero)
 	 * @return string
 	 */
@@ -64,8 +64,8 @@ class File {
 	/**
 	 * Write the contents of a file, replacing it atomically if it already exists.
 	 *
-	 * @param  string $path
-	 * @param  string $content
+	 * @param string $path
+	 * @param string $content
 	 * @return void
 	 */
 	public function replace($path, $content) {

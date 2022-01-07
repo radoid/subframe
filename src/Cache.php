@@ -64,19 +64,19 @@ class Cache {
 		$path = $this->directory.$name;
 		$isDone = file_put_contents($path, $content, LOCK_EX);
 		if ($isDone)
-			@touch($path, time() + ($ttl ? $ttl : $this->ttl));
+			@touch($path, time() + ($ttl ?: $this->ttl));
 		return $isDone;
 	}
 
 	/**
 	 * Retrieves the item stored under the filename, if it exists and is still valid
 	 * @param string $name The filename
-	 * @return mixed|bool The content on success or false on failure or expiry
+	 * @return string|null The content on success or null on failure or expiry
 	 */
 	public function get($name) {
 		if (@filemtime($path = $this->directory.$name) >= time())
 			$content = file_get_contents($path);
-		return isset($content) ? $content : false;
+		return $content ?? null;
 	}
 
 	/**
@@ -104,11 +104,12 @@ class Cache {
 	/**
 	 * Returns the item's expiry time (Unix timestamp)
 	 * @param string $name
-	 * @return int|bool Timestamp or false on failure
+	 * @return int|null Timestamp or null on failure
 	 */
 	public function getTime($name) {
 		$mtime = @filemtime($this->directory.$name);
-		return $mtime;
+
+		return $mtime ?? null;
 	}
 
 	/**
@@ -126,12 +127,12 @@ class Cache {
 	/**
 	 * Retrieves the var_export-ed data
 	 * @param string $name
-	 * @return bool|mixed The data, or false on error
+	 * @return mixed|null The data, or null on error
 	 */
 	public function import($name) {
 		if (@filemtime($path = $this->directory.$name.'.php') >= time())
 			$data = @(include $path);
-		return isset($data) ? $data : false;
+		return $data ?? null;
 	}
 
 	/**
@@ -149,12 +150,12 @@ class Cache {
 	/**
 	 * Retrieves and unserializes the data
 	 * @param string $name
-	 * @return bool|mixed The data, or false on error
+	 * @return mixed|null The data, or null on error
 	 */
 	public function unserialize($name) {
 		if (@filemtime($path = $this->directory.$name) >= time())
 			$data = $this->get($name);
-		return isset($data) ? unserialize($data) : false;
+		return isset($data) ? unserialize($data) : null;
 	}
 
 	/**

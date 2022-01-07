@@ -9,17 +9,18 @@ class Image {
 
 	/**
 	 * Takes an image or part of it and saves it in another size, optionally rotated too
-	 * @param $source
-	 * @param $srcX
-	 * @param $srcY
-	 * @param $srcWidth
-	 * @param $srcHeight
-	 * @param $destWidth
-	 * @param $destHeight
-	 * @param string $destination
+	 * @param string $source
+	 * @param int $srcX
+	 * @param int $srcY
+	 * @param int $srcWidth
+	 * @param int $srcHeight
+	 * @param int $destWidth
+	 * @param int $destHeight
+	 * @param string|null $destination
 	 * @param int $destinationType
-	 * @param int $rotation
-	 * @return string destination path or false in case of an error
+	 * @param float $rotationAngle
+	 * @param int $quality
+	 * @return bool true if successful or false in case of an error
 	 */
 	static function resample($source, $srcX, $srcY, $srcWidth, $srcHeight, $destWidth, $destHeight, $destination = '', $destinationType = 0, $rotation = 0) {
 		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
@@ -53,26 +54,25 @@ class Image {
 		$destination = ($destination ?: $source);
 		$destinationType = ($destinationType ?: $type);
 		if ($destinationType == IMAGETYPE_GIF)
-			$success = imagegif($imageAfter, $destination);
+			$isSuccess = imagegif($imageAfter, $destination);
 		elseif ($destinationType == IMAGETYPE_PNG)
-			$success = imagepng($imageAfter, $destination);
+			$isSuccess = imagepng($imageAfter, $destination);
 		else
-			$success = imagejpeg($imageAfter, $destination, 98);
-		if (!$success)
-			return false;
+			$isSuccess = imagejpeg($imageAfter, $destination, 98);
 
-		return $destination;
+		return $isSuccess;
 	}
 
 	/**
 	 * Ensures the image doesn't exceed the given size
-	 * @param $source
-	 * @param $maxWidth
-	 * @param $maxHeight
-	 * @param string $destination
+	 * @param string $source
+	 * @param int $maxWidth
+	 * @param int $maxHeight
+	 * @param string|null $destination
 	 * @param int $destinationType
 	 * @param bool $canCrop
-	 * @return string destination path or false in case of an error
+	 * @param int $quality
+	 * @return bool true if successful or false in case of an error
 	 */
 	static function constrain($source, $maxWidth, $maxHeight, $destination = '', $destinationType = 0, $canCrop = false) {
 		list ($initialWidth, $initialHeight, $type) = @getimagesize($source);
@@ -87,7 +87,7 @@ class Image {
 		if ($initialWidth <= $maxWidth && $initialHeight <= $maxHeight  // if the file doesn't change
 				&& (!$destinationType || $destinationType == $type)
 				&& (!$destination || $destination == $source))
-			return $source;
+			return true;
 
 		if ($canCrop) {  // take only the center part to fit new dimensions
 			$destWidth = $maxWidth;
@@ -112,9 +112,9 @@ class Image {
 
 	/**
 	 * Rotates an image
-	 * @param $source
-	 * @param $angle
-	 * @param string $destination
+	 * @param string $source
+	 * @param float $angle
+	 * @param string|null $destination
 	 * @param int $destinationType
 	 * @return bool|string
 	 */
@@ -143,15 +143,13 @@ class Image {
 		$destination = ($destination ?: $source);
 		$destinationType = ($destinationType ?: $type);
 		if ($destinationType == IMAGETYPE_GIF)
-			$success = imagegif($imageAfter, $destination);
+			$isSuccess = imagegif($imageAfter, $destination);
 		elseif ($destinationType == IMAGETYPE_PNG)
-			$success = imagepng($imageAfter, $destination);
+			$isSuccess = imagepng($imageAfter, $destination);
 		else
-			$success = imagejpeg($imageAfter, $destination, 98);
-		if (!$success)
-			return false;
+			$isSuccess = imagejpeg($imageAfter, $destination, $quality);
 
-		return $destination;
+		return $isSuccess;
 	}
 
 }

@@ -161,7 +161,7 @@ class Model {
 
 	/**
 	 * Inserts the object into the DB table
-	 * @return int The insert ID
+	 * @return string The insert ID
 	 */
 	public function insert() {
 		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
@@ -191,7 +191,7 @@ class Model {
 	 * @param string|string[] $id Optional value looked up in the key column
 	 */
 	public function update($id = '') {
-		$id = (isset($id) ? $id : $this->{static::KEY});
+		$id = ($id ?? $this->{static::KEY});
 		$sql = strval($this);
 		if (is_array($id) && !$id || !$sql)
 			return;
@@ -220,13 +220,15 @@ class Model {
 		self::$pdo->exec($sql);
 	}
 
-	/** Returns the total record count in the table
+	/**
+	 * Returns the total record count in the table
 	 * @return int
 	 * @throws \Exception
 	 */
 	public static function count() {
 		$sql = "SELECT COUNT(*) FROM ".static::TABLE;
-		return self::result($sql);
+		$count = self::result($sql);
+		return (int) $count;
 	}
 
 	/**

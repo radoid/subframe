@@ -18,9 +18,10 @@
 		}
 	],
 	"require": {
-		"php": ">=7.1.0",
+		"php": ">=7.0.0",
 		"ext-mbstring": "*",
-		"ext-pdo": "*"
+		"ext-pdo": "*",
+		"ext-json": "*"
 	},
 	"autoload": {
 		"psr-4": {

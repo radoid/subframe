@@ -9,6 +9,6 @@ spl_autoload_register(function ($class) {
 		or @(include __DIR__.'/../../src/'.$class);
 });
 
-Router::route('GET', '/', function () {
+Router::fromRequestUri()->route('GET', '/', function () {
 	echo 'home';
 });
