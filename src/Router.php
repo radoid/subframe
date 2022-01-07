@@ -18,15 +18,23 @@ class Router {
 
 
 	/**
-	 * The constructor
+	 * Creates a router for the given request parameters or for the current request
 	 * @param string|null $method HTTP method/verb
-	 * @param string|null $uri requested URI
+	 * @param string|null $uri requested URI; if not specified, it's resolved automatically — from REQUEST_URI, but relative to the script's directory (to also take care of small websites that reside in a subdirectory)
 	 * @param Cache|null $cache
 	 */
 	public function __construct(?string $method = null, ?string $uri = null, ?Cache $cache = null) {
-		$this->method = $method;
-		$this->uri = trim(strtok($uri, '?'), '/');
+		$this->method = $method ?? $_SERVER['REQUEST_METHOD'] ?? 'GET';
+		$this->uri = $uri ?? self::getRequestUri();
 		$this->cache = $cache;
+
+		if (!isset($uri)) {
+			$subdir = dirname($_SERVER['SCRIPT_NAME']);
+			if (isset($_SERVER['REQUEST_URI']) && $subdir != '.')
+				$this->uri = substr($this->uri, strlen($subdir));
+		}
+
+		$this->uri = trim(strtok($this->uri, '?'), '/');
 	}
 
 	/**
@@ -34,9 +42,9 @@ class Router {
 	 * @param Cache|null $cache
 	 * @return Router
 	 */
-	public static function fromRequestUri(Cache $cache = null): Router {
-		$method = $_SERVER['REQUEST_METHOD'];
-		$requestUri = $_SERVER['REQUEST_URI'];
+	public static function fromRequestUri(?Cache $cache = null): Router {
+		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+		$requestUri = self::getRequestUri();
 
 		return new Router($method, $requestUri, $cache);
 	}
@@ -46,9 +54,9 @@ class Router {
 	 * @param Cache|null $cache
 	 * @return Router
 	 */
-	public static function fromPathInfo(Cache $cache = null): Router {
-		$method = $_SERVER['REQUEST_METHOD'];
-		$pathInfo = $_SERVER['PATH_INFO'] ?? '/';
+	public static function fromPathInfo(?Cache $cache = null): Router {
+		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+		$pathInfo = self::getPathInfo();
 
 		return new Router($method, $pathInfo, $cache);
 	}
@@ -59,11 +67,11 @@ class Router {
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @param Cache|null $cache Optional cache if caching is desired
 	 */
-	public function routeInNamespace(string $namespace, array $classArgs = [], Cache $cache = null) {
+	public function routeInNamespace(string $namespace, array $classArgs = []) {
 		if (($route = $this->findRouteInNamespace($namespace))) {
 			[$class, $action, $args] = $route;
 			$instance = new $class(...$classArgs);
-			self::handleRoute([$instance, $action], $args, $cache ?? $this->cache);
+			self::handleRoute([$instance, $action], $args, $this->cache);
 		}
 	}
 
@@ -71,12 +79,11 @@ class Router {
 	 * Defines a route: checks if the request is compatible with the given URI, and routes the request to the given callable if it is
 	 * @param string $method The HTTP request method
 	 * @param string $uri The URI for the route
-	 * @param callable $callable A closure or [Controller, action] combination
+	 * @param mixed $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @param Cache|null $cache Optional cache if caching is desired
 	 * @return Router
 	 */
-	public function route(string $method, string $uri, callable $callable, array $classArgs = [], ?Cache $cache = null): self {
+	public function route(string $method, string $uri, callable $callable, array $classArgs = []): self {
 		$uri = trim($uri, '/');
 
 		if ($method == $this->method && preg_match("~^$uri$~", $this->uri, $matches)) {
@@ -89,6 +96,78 @@ class Router {
 		}
 
 		return $this;
+	}
+
+	/**
+	 * Defines a GET route, using route() method
+	 * @param string $uri The URI for the route
+	 * @param mixed $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @return Router
+	 */
+	public function get(string $uri, $callable, array $classArgs = []): self {
+		return $this->route('GET', $uri, $callable, $classArgs);
+	}
+
+	/**
+	 * Defines a POST route, using route() method
+	 * @param string $uri The URI for the route
+	 * @param mixed $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @return Router
+	 */
+	public function post(string $uri, $callable, array $classArgs = []): self {
+		return $this->route('POST', $uri, $callable, $classArgs);
+	}
+
+	/**
+	 * Defines a PUT route, using route() method
+	 * @param string $uri The URI for the route
+	 * @param mixed $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @return Router
+	 */
+	public function put(string $uri, $callable, array $classArgs = []): self {
+		return $this->route('PUT', $uri, $callable, $classArgs);
+	}
+
+	/**
+	 * Defines a DELETE route, using route() method
+	 * @param string $uri The URI for the route
+	 * @param mixed $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @return Router
+	 */
+	public function delete(string $uri, $callable, array $classArgs = []): self {
+		return $this->route('DELETE', $uri, $callable, $classArgs);
+	}
+
+	/**
+	 * Defines a OPTIONS route, using route() method
+	 * @param string $uri The URI for the route
+	 * @param mixed $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @return Router
+	 */
+	public function options(string $uri, $callable, array $classArgs = []): self {
+		return $this->route('OPTIONS', $uri, $callable, $classArgs);
+	}
+
+	/**
+	 * Defines a GET route, using route() method, that only outputs a template/view
+	 * @param string $uri The URI for the route
+	 * @param string $filename Template name
+	 * @param array $data Optional data for the template
+	 * @return Router
+	 */
+	public function view(string $uri, string $filename, array $data = []): self {
+		return $this->route('GET', $uri, function () use ($filename, $data) {
+			new class ($filename, $data) extends Controller {
+				function __construct($filename, $data) {
+					$this->view($filename, $data);
+				}
+			};
+		});
 	}
 
 	/**
@@ -169,7 +248,7 @@ class Router {
 	 * @param Cache|null $cache
 	 */
 	private static function handleRoute(callable $callable, array $args, Cache $cache = null) {
-		$gzip = (strpos(@$_SERVER['HTTP_ACCEPT_ENCODING'], "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');
+		$gzip = (strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');
 
 		$cachename = ($cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output".str_replace("/", "-", $_SERVER['REQUEST_URI']).".html$gzip" : false);
 		if ($cachename) {
@@ -237,28 +316,27 @@ class Router {
 	}
 
 	/**
-	 * Obtains the current request URI
+	 * Obtains the current request URI; in case of a shell script, it's built from the script's arguments
 	 * @return string
 	 */
 	public static function getRequestUri(): string {
 		global $argv;
-		if (isset($_SERVER['REQUEST_METHOD'])) {
-			$uri = rawurldecode($_SERVER['REQUEST_URI'] ?? '/');
-			$uri = substr($uri, 0, strcspn($uri, '?'));
-		} else
+		if (isset($_SERVER['REQUEST_URI']))
+			$uri = rawurldecode(strtok($_SERVER['REQUEST_URI'], '?'));
+		else
 			$uri = '/'.join('/', array_slice($argv, 1));
 
 		return $uri;
 	}
 
 	/**
-	 * Obtains the current request URI from the PATH_INFO variable
+	 * Obtains the current PATH_INFO variable; in case of a shell script, it's built from the script's arguments
 	 * @return string
 	 */
 	public static function getPathInfo(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_METHOD'])) {
-			$uri = rawurldecode($_SERVER['PATH_INFO'] ?? '/');
+			$uri = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
 		} else
 			$uri = '/'.join('/', array_slice($argv, 1));
 
