@@ -25,15 +25,8 @@ class Router {
 	 */
 	public function __construct(?string $method = null, ?string $uri = null, ?Cache $cache = null) {
 		$this->method = $method ?? $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$this->uri = $uri ?? self::getRequestUri();
+		$this->uri = $uri ?? self::getRelativeRequestUri();
 		$this->cache = $cache;
-
-		if (!isset($uri)) {
-			$subdir = dirname($_SERVER['SCRIPT_NAME']);
-			if (isset($_SERVER['REQUEST_URI']) && $subdir != '.')
-				$this->uri = substr($this->uri, strlen($subdir));
-		}
-
 		$this->uri = trim(strtok($this->uri, '?'), '/');
 	}
 
@@ -322,9 +315,22 @@ class Router {
 	public static function getRequestUri(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_URI']))
-			$uri = rawurldecode(strtok($_SERVER['REQUEST_URI'], '?'));
+			$uri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
 		else
 			$uri = '/'.join('/', array_slice($argv, 1));
+
+		return $uri;
+	}
+
+	/**
+	 * Obtains the current request URI, relative to the directory the script is in, unless in case of a shell script
+	 * @return string
+	 */
+	public static function getRelativeRequestUri(): string {
+		$uri = self::getRequestUri();
+		$subdir = dirname($_SERVER['SCRIPT_NAME']);
+		if (isset($_SERVER['REQUEST_URI']) && $subdir != '.')
+			$uri = substr($uri, strlen($subdir));
 
 		return $uri;
 	}
