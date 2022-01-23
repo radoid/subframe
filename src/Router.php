@@ -7,6 +7,9 @@ namespace Subframe;
  */
 class Router {
 
+	/** @var Request */
+	private $request;
+
 	/** @var string */
 	private $method;
 
@@ -23,11 +26,11 @@ class Router {
 	 * @param string|null $uri requested URI; if not specified, it's resolved automatically — from REQUEST_URI, but relative to the script's directory (to also take care of small websites that reside in a subdirectory)
 	 * @param Cache|null $cache
 	 */
-	public function __construct(?string $method = null, ?string $uri = null, ?Cache $cache = null) {
-		$this->method = $method ?? $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$this->uri = $uri ?? self::getRelativeRequestUri();
+	public function __construct(?Request $request = null, ?Cache $cache = null) {
+		$this->request = $request ?? Request::fromRelativeRequestUri();
+		$this->method = $this->request->getMethod();
+		$this->uri = trim(strtok($this->request->getUri(), '?'), '/');
 		$this->cache = $cache;
-		$this->uri = trim(strtok($this->uri, '?'), '/');
 	}
 
 	/**
@@ -35,11 +38,8 @@ class Router {
 	 * @param Cache|null $cache
 	 * @return Router
 	 */
-	public static function fromRequestUri(?Cache $cache = null): Router {
-		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$requestUri = self::getRequestUri();
-
-		return new Router($method, $requestUri, $cache);
+	public static function fromRequestUri(?Cache $cache = null): self {
+		return new self(Request::fromRequestUri(), $cache);
 	}
 
 	/**
@@ -47,11 +47,8 @@ class Router {
 	 * @param Cache|null $cache
 	 * @return Router
 	 */
-	public static function fromPathInfo(?Cache $cache = null): Router {
-		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$pathInfo = self::getPathInfo();
-
-		return new Router($method, $pathInfo, $cache);
+	public static function fromPathInfo(?Cache $cache = null): self {
+		return new self(Request::fromPathInfo(), $cache);
 	}
 
 	/**
@@ -63,9 +60,26 @@ class Router {
 	public function routeInNamespace(string $namespace, array $classArgs = []) {
 		if (($route = $this->findRouteInNamespace($namespace))) {
 			[$class, $action, $args] = $route;
-			$instance = new $class(...$classArgs);
-			self::handleRoute([$instance, $action], $args, $this->cache);
+			$instance = new $class($this->request, ...$classArgs);
+			self::executeCallable([$instance, $action], $args, $this->cache);
 		}
+	}
+
+	/**
+	 * Tries to dispatch the request within a namespace
+	 * @param string $namespace The namespace; the root namespace if empty
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @param Cache|null $cache Optional cache if caching is desired
+	 */
+	public function captureResponseInNamespace(string $namespace, array $classArgs = []): ?Response {
+		if (($route = $this->findRouteInNamespace($namespace))) {
+			[$class, $action, $args] = $route;
+			$instance = new $class($this->request, ...$classArgs);
+			$response = self::captureCallable([$instance, $action], $args);
+		} else
+			$response = null;
+
+		return $response;
 	}
 
 	/**
@@ -76,16 +90,17 @@ class Router {
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @return Router
 	 */
-	public function route(string $method, string $uri, callable $callable, array $classArgs = []): self {
+	public function route(string $method, string $uri, $callable, array $classArgs = []): self {
 		$uri = trim($uri, '/');
 
 		if ($method == $this->method && preg_match("~^$uri$~", $this->uri, $matches)) {
 			if (is_string($callable) && strpos($callable, '@') !== false)
 				$callable = explode('@', $callable);
 			if (is_array($callable) && is_string($callable[0]))
-				$callable[0] = new $callable[0](...$classArgs);
+				$callable[0] = new $callable[0]($this->request, ...$classArgs);
 			$args = array_slice($matches, 1);
-			self::handleRoute($callable, $args, $cache ?? $this->cache);
+
+			self::executeCallable($callable, $args, $cache ?? $this->cache);
 		}
 
 		return $this;
@@ -240,7 +255,7 @@ class Router {
 	 * @param array $args
 	 * @param Cache|null $cache
 	 */
-	private static function handleRoute(callable $callable, array $args, Cache $cache = null) {
+	private static function executeCallable(callable $callable, array $args, Cache $cache = null) {
 		$gzip = (strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');
 
 		$cachename = ($cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output".str_replace("/", "-", $_SERVER['REQUEST_URI']).".html$gzip" : false);
@@ -285,6 +300,25 @@ class Router {
 			exit;
 	}
 
+	private static function captureCallable(callable $callable, array $args): Response {
+		ob_start();
+		$result = call_user_func_array($callable, $args);
+		$output = ob_get_clean();
+		$headers = headers_list();
+		$status = http_response_code();
+
+		if ($result instanceof Response)
+			$response = $result;
+		elseif (is_string($result))
+			$response = new Response($status, $headers, $result);
+		elseif (is_array($result) || is_object($result))
+			$response = new Response($status, array_merge($headers, ['Content-Type: application/json; charset=utf-8']), json_encode($result));
+		else
+			$response = new Response($status, $headers, $output);
+
+		return $response;
+	}
+
 	/**
 	 * Changes case of the argument as if it was a class name (capital letter on each word boundary)
 	 * @param string $arg The argument
@@ -306,67 +340,6 @@ class Router {
 		if (strpbrk($arg, '-.'))
 			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
 		return ($method ? $method.ucfirst($arg) : $arg);
-	}
-
-	/**
-	 * Obtains the current request URI; in case of a shell script, it's built from the script's arguments
-	 * @return string
-	 */
-	public static function getRequestUri(): string {
-		global $argv;
-		if (isset($_SERVER['REQUEST_URI']))
-			$uri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
-		else
-			$uri = '/'.join('/', array_slice($argv, 1));
-
-		return $uri;
-	}
-
-	/**
-	 * Obtains the current request URI, relative to the directory the script is in, unless in case of a shell script
-	 * @return string
-	 */
-	public static function getRelativeRequestUri(): string {
-		$uri = self::getRequestUri();
-		$subdir = dirname($_SERVER['SCRIPT_NAME']);
-		if (isset($_SERVER['REQUEST_URI']) && $subdir != '.')
-			$uri = substr($uri, strlen($subdir));
-
-		return $uri;
-	}
-
-	/**
-	 * Obtains the current PATH_INFO variable; in case of a shell script, it's built from the script's arguments
-	 * @return string
-	 */
-	public static function getPathInfo(): string {
-		global $argv;
-		if (isset($_SERVER['REQUEST_METHOD'])) {
-			$uri = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
-		} else
-			$uri = '/'.join('/', array_slice($argv, 1));
-
-		return $uri;
-	}
-
-	/**
-	 * Remote address the request was made from
-	 * @return string
-	 */
-	public static function getRemoteAddr(): string {
-		if (!empty ($_SERVER['HTTP_X_FORWARDED_FOR']))
-			foreach (explode(",", $_SERVER['HTTP_X_FORWARDED_FOR']) as $ipaddr)
-				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
-					return $ipaddr;
-		return $_SERVER['REMOTE_ADDR'];
-	}
-
-	/**
-	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
-	 * @return boolean
-	 */
-	public static function isAjax(): bool {
-		return (@$_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
 	}
 
 	/**

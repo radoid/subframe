@@ -7,6 +7,13 @@ namespace Subframe;
  */
 class Controller {
 
+	/** @var Request */
+	protected $request;
+
+	public function __construct(Request $request) {
+		$this->request = $request;
+	}
+
 	/**
 	 * Outputs a view/template provided with given data
 	 * @param string $__filename The filename of the view, without ".php" extension

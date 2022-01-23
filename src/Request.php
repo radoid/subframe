@@ -3,7 +3,137 @@ namespace Subframe;
 
 use Exception;
 
-class Request {
+class Request implements RequestInterface {
+
+	/** @var string */
+	private $method;
+
+	/** @var string */
+	private $uri;
+
+	/** @var array */
+	private $get;
+
+	/** @var array */
+	private $post;
+
+	/** @var array */
+	private $cookie;
+
+	/** @var array */
+	private $files;
+
+	/** @var array */
+	private $params;
+
+	/**
+	 * Creates a request for the given request parameters or for the current request
+	 * @param string|null $method HTTP method/verb
+	 * @param string|null $uri requested URI; if not specified, it's resolved automatically — from REQUEST_URI, but relative to the script's directory (to also take care of small websites that reside in a subdirectory)
+	 * @throws Exception
+	 */
+	public function __construct(string $method, string $uri, array $get = [], array $post = [], array $cookie = [], array $files = [], array $params = []) {
+		$this->method = $method;
+		$this->uri = $uri;
+		$this->get = $get;
+		$this->post = $post;
+		$this->cookie = $cookie;
+		$this->files = [];
+		$this->params = $params;
+
+		foreach ($files as $varname => $file)
+			if (is_array($file['name'])) {
+				foreach ($file as $key => $array)
+					foreach ($array as $i => $value)
+						if ($file['error'][$i] != UPLOAD_ERR_NO_FILE)
+							$this->files[$varname][$i][$key] = $value;
+			} else
+				if ($file['error'] != UPLOAD_ERR_NO_FILE)
+					$this->files[$varname][] = $file;
+
+		if ($method == 'POST') {
+			$upload_max_filesize = ini_get('upload_max_filesize');
+			$post_max_size = ini_get('post_max_size');
+
+			if ($params['CONTENT_LENGTH'] > 0 && !$post && !$files)
+				throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
+
+			foreach ($files as $file)
+				if ($file['error'])
+					switch ($file['error']) {
+						case UPLOAD_ERR_INI_SIZE:
+							throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
+						case UPLOAD_ERR_FORM_SIZE:
+							throw new Exception("\"$file[name]\" is too big.", 400);
+						case UPLOAD_ERR_PARTIAL:
+							throw new Exception("\"$file[name]\" was not uploaded.", 500);
+						case UPLOAD_ERR_NO_TMP_DIR:
+							throw new Exception('No tmp directory.', 500);
+						case UPLOAD_ERR_CANT_WRITE:
+							throw new Exception('Write error.', 500);
+						case UPLOAD_ERR_EXTENSION:
+							throw new Exception('File extension is not allowed.', 500);
+						default:
+							throw new Exception("Upload failed (error $file[error]).", 500);
+					}
+		}
+	}
+
+	/**
+	 * Creates a request for the request from the REQUEST_URI constant
+	 * @return Request
+	 * @throws Exception
+	 */
+	public static function fromRequestUri(): self {
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getRequestUri(), $_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
+	}
+
+	/**
+	 * Creates a request for the request from the REQUEST_URI constant, relative to the script's directory
+	 * @return Request
+	 * @throws Exception
+	 */
+	public static function fromRelativeRequestUri(): self {
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getRelativeRequestUri(), $_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
+	}
+
+	/**
+	 * Creates a request for the request from the PATH_INFO constant
+	 * @return Request
+	 * @throws Exception
+	 */
+	public static function fromPathInfo(): self {
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getPathInfo(), $_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
+	}
+
+	public function getMethod(): string {
+		return $this->method;
+	}
+
+	public function getUri(): string {
+		return $this->uri;
+	}
+
+	public function get(?string $name = null) {
+		return (isset($name) ? $this->get[$name] ?? null : $this->get);
+	}
+
+	public function post(?string $name = null) {
+		return (isset($name) ? $this->post[$name] ?? null : $this->post);
+	}
+
+	public function file(string $name) {
+		return $this->files[$name] ?? null;
+	}
+
+	/**
+	 * Obtains uploaded files array in a normalized form
+	 * @return array
+	 * @throws Exception
+	 */
+	public function getUploadedFiles(): array {
+		return $this->files;
+	}
 
 	/**
 	 * Obtains the current request URI; in case of a shell script, it's built from the script's arguments
@@ -56,53 +186,6 @@ class Request {
 				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
 					return $ipaddr;
 		return $_SERVER['REMOTE_ADDR'];
-	}
-
-	/**
-	 * Obtains uploaded files array in a normalized form
-	 * @return array
-	 * @throws Exception
-	 */
-	public static function getUploadedFiles(): array {
-		$files = [];
-		foreach ($_FILES ?? [] as $varname => $file)
-			if (is_array($file['name'])) {
-				foreach ($file as $key => $array)
-					foreach ($array as $i => $value)
-						if ($file['error'][$i] != UPLOAD_ERR_NO_FILE)
-							$files[$varname][$i][$key] = $value;
-			} else
-				if ($file['error'] != UPLOAD_ERR_NO_FILE)
-					$files[$varname][] = $file;
-
-		if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-			$upload_max_filesize = intval(ini_get('upload_max_filesize'));
-			$post_max_size = intval(ini_get('post_max_size'));
-
-			if ($_SERVER['CONTENT_LENGTH'] > 0 && !$_POST && !$_FILES)
-				throw new Exception("Total upload size exceeds limit ($post_max_size MB).", 400);
-
-			foreach ($files as $file)
-				if ($file['error'])
-					switch ($file['error']) {
-						case UPLOAD_ERR_INI_SIZE:
-							throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize MB).", 400);
-						case UPLOAD_ERR_FORM_SIZE:
-							throw new Exception("\"$file[name]\" is too big.", 400);
-						case UPLOAD_ERR_PARTIAL:
-							throw new Exception("\"$file[name]\" was not uploaded.", 500);
-						case UPLOAD_ERR_NO_TMP_DIR:
-							throw new Exception('No tmp directory.', 500);
-						case UPLOAD_ERR_CANT_WRITE:
-							throw new Exception('Write error.', 500);
-						case UPLOAD_ERR_EXTENSION:
-							throw new Exception('File extension is not allowed.', 500);
-						default:
-							throw new Exception("Upload failed (error $file[error]).", 500);
-					}
-		}
-
-		return $files;
 	}
 
 	/**
