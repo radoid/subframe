@@ -25,7 +25,7 @@ class Router {
 	 */
 	public function __construct(?string $method = null, ?string $uri = null, ?Cache $cache = null) {
 		$this->method = $method ?? $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$this->uri = $uri ?? self::getRelativeRequestUri();
+		$this->uri = $uri ?? Request::getRelativeRequestUri();
 		$this->cache = $cache;
 		$this->uri = trim(strtok($this->uri, '?'), '/');
 	}
@@ -37,7 +37,7 @@ class Router {
 	 */
 	public static function fromRequestUri(?Cache $cache = null): Router {
 		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$requestUri = self::getRequestUri();
+		$requestUri = Request::getRequestUri();
 
 		return new Router($method, $requestUri, $cache);
 	}
@@ -49,7 +49,7 @@ class Router {
 	 */
 	public static function fromPathInfo(?Cache $cache = null): Router {
 		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$pathInfo = self::getPathInfo();
+		$pathInfo = Request::getPathInfo();
 
 		return new Router($method, $pathInfo, $cache);
 	}
@@ -306,67 +306,6 @@ class Router {
 		if (strpbrk($arg, '-.'))
 			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
 		return ($method ? $method.ucfirst($arg) : $arg);
-	}
-
-	/**
-	 * Obtains the current request URI; in case of a shell script, it's built from the script's arguments
-	 * @return string
-	 */
-	public static function getRequestUri(): string {
-		global $argv;
-		if (isset($_SERVER['REQUEST_URI']))
-			$uri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
-		else
-			$uri = '/'.join('/', array_slice($argv, 1));
-
-		return $uri;
-	}
-
-	/**
-	 * Obtains the current request URI, relative to the directory the script is in, unless in case of a shell script
-	 * @return string
-	 */
-	public static function getRelativeRequestUri(): string {
-		$uri = self::getRequestUri();
-		$subdir = dirname($_SERVER['SCRIPT_NAME']);
-		if (isset($_SERVER['REQUEST_URI']) && $subdir != '.')
-			$uri = substr($uri, strlen($subdir));
-
-		return $uri;
-	}
-
-	/**
-	 * Obtains the current PATH_INFO variable; in case of a shell script, it's built from the script's arguments
-	 * @return string
-	 */
-	public static function getPathInfo(): string {
-		global $argv;
-		if (isset($_SERVER['REQUEST_METHOD'])) {
-			$uri = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
-		} else
-			$uri = '/'.join('/', array_slice($argv, 1));
-
-		return $uri;
-	}
-
-	/**
-	 * Remote address the request was made from
-	 * @return string
-	 */
-	public static function getRemoteAddr(): string {
-		if (!empty ($_SERVER['HTTP_X_FORWARDED_FOR']))
-			foreach (explode(",", $_SERVER['HTTP_X_FORWARDED_FOR']) as $ipaddr)
-				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
-					return $ipaddr;
-		return $_SERVER['REMOTE_ADDR'];
-	}
-
-	/**
-	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
-	 * @return boolean
-	 */
-	public static function isAjax(): bool {
-		return (@$_SERVER['HTTP_X_REQUESTED_WITH'] == "XMLHttpRequest");
 	}
 
 	/**
