@@ -71,7 +71,7 @@ class Router {
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @param Cache|null $cache Optional cache if caching is desired
 	 */
-	public function captureResponseInNamespace(string $namespace, array $classArgs = []): ?Response {
+	public function captureRouteInNamespace(string $namespace, array $classArgs = []): ?Response {
 		if (($route = $this->findRouteInNamespace($namespace))) {
 			[$class, $action, $args] = $route;
 			$instance = new $class($this->request, ...$classArgs);
@@ -104,6 +104,45 @@ class Router {
 		}
 
 		return $this;
+	}
+
+	/**
+	 * Defines a route: checks if the request is compatible with the given URI, and routes the request to the given callable if it is
+	 * @param string $method The HTTP request method
+	 * @param string $uri The URI for the route
+	 * @param mixed $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @return ?Response
+	 */
+	public function captureRoute(string $method, string $uri, $callable, array $classArgs = []): ?Response {
+		$uri = trim($uri, '/');
+
+		if ($method == $this->method && preg_match("~^$uri$~", $this->uri, $matches)) {
+			if (is_string($callable) && strpos($callable, '@') !== false)
+				$callable = explode('@', $callable);
+			if (is_array($callable) && is_string($callable[0]))
+				$callable[0] = new $callable[0]($this->request, ...$classArgs);
+			$args = array_slice($matches, 1);
+
+			$response = self::captureCallable($callable, $args);
+		} else
+			$response = null;
+
+		return $response;
+	}
+
+	/**
+	 * @return ?Response
+	 */
+	public function captureViewRoute(string $uri, string $filename, array $data = []): ?Response {
+		$uri = trim($uri, '/');
+
+		if ($this->method == 'GET' && $uri == $this->uri)
+			$response = Response::fromView($filename, $data);
+		else
+			$response = null;
+
+		return $response;
 	}
 
 	/**
