@@ -136,6 +136,34 @@ class Request implements RequestInterface {
 	}
 
 	/**
+	 * Remote address the request was made from
+	 * @return string
+	 */
+	public function getRemoteAddr(): string {
+		if (!empty($this->params['HTTP_X_FORWARDED_FOR']))
+			foreach (explode(",", $this->params['HTTP_X_FORWARDED_FOR']) as $ipaddr)
+				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
+					return $ipaddr;
+		return $this->params['REMOTE_ADDR'];
+	}
+
+	/**
+	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
+	 * @return boolean
+	 */
+	public function isAjax(): bool {
+		return ($this->params['HTTP_X_REQUESTED_WITH'] ?? '') == 'XMLHttpRequest';
+	}
+
+	/**
+	 * Tells whether JSON format is requested (in Accept header field)
+	 * @return boolean
+	 */
+	public function acceptsJson(): bool {
+		return strpos($this->params['HTTP_ACCEPT'], '/json') !== false;
+	}
+
+	/**
 	 * Obtains the current request URI; in case of a shell script, it's built from the script's arguments
 	 * @return string
 	 */
@@ -174,26 +202,6 @@ class Request implements RequestInterface {
 			$uri = '/'.join('/', array_slice($argv, 1));
 
 		return $uri;
-	}
-
-	/**
-	 * Remote address the request was made from
-	 * @return string
-	 */
-	public static function getRemoteAddr(): string {
-		if (!empty ($_SERVER['HTTP_X_FORWARDED_FOR']))
-			foreach (explode(",", $_SERVER['HTTP_X_FORWARDED_FOR']) as $ipaddr)
-				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
-					return $ipaddr;
-		return $_SERVER['REMOTE_ADDR'];
-	}
-
-	/**
-	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
-	 * @return boolean
-	 */
-	public static function isAjax(): bool {
-		return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') == 'XMLHttpRequest';
 	}
 
 }

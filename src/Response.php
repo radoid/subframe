@@ -35,19 +35,23 @@ class Response implements ResponseInterface {
 		echo $this->body;
 	}
 
-	public static function fromView(string $filename, array $data = [], int $statusCode = 200) {
+	public static function fromView(string $filename, array $data = [], int $statusCode = 200): Response {
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE & ~E_WARNING);
 		ob_start();
 
-		(function ($_data) {
+		(function ($_filename, $_data) {
 			extract($_data);
 			require "$_filename.php";
-		})($data);
+		})($filename, $data);
 
 		$output = ob_get_clean();
 		error_reporting($error_reporting);
 
 		return new Response($statusCode, [], $output);
+	}
+
+	public static function fromData(array $data = [], int $statusCode = 200): Response {
+		return new Response($statusCode, ['Content-Type: application/json; charset=utf-8'], json_encode($data));
 	}
 
 }
