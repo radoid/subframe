@@ -339,7 +339,7 @@ class Router {
 			exit;
 	}
 
-	private static function captureCallable(callable $callable, array $args): Response {
+	private static function captureCallable(callable $callable, array $args): ?Response {
 		ob_start();
 		$result = call_user_func_array($callable, $args);
 		$output = ob_get_clean();
@@ -352,8 +352,10 @@ class Router {
 			$response = new Response($status, $headers, $result);
 		elseif (is_array($result) || is_object($result))
 			$response = new Response($status, array_merge($headers, ['Content-Type: application/json; charset=utf-8']), json_encode($result));
-		else
+		elseif ($result !== false)
 			$response = new Response($status, $headers, $output);
+		else
+			$response = null;
 
 		return $response;
 	}

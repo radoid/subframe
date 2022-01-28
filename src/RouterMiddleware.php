@@ -18,7 +18,7 @@ class RouterMiddleware implements MiddlewareInterface {
 			elseif ($uri !== null)
 				$response = $router->captureViewRoute($uri, $action, $args);
 			else
-				$response = $router->captureRouteInNamespace($uri, $args);
+				$response = $router->captureRouteInNamespace($action, $args);
 			if ($response)
 				return $response;
 		}
