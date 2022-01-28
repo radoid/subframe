@@ -53,6 +53,26 @@ class App {
 		return $this;
 	}
 
+	public function exceptionView(string $filename): self {
+		$middleware = function (Request $request, RequestHandlerInterface $handler) use ($filename): ResponseInterface {
+			try {
+				$response = $handler->handle($request);
+			} catch (\Throwable $e) {
+				$code = $e->getCode();
+				$code = ($code >= 400 && $code < 500 ? $code : 500);
+				$data = ['status' => $code, 'error' => $e->getMessage()];
+				if ($request->acceptsJson())
+					$response = Response::fromData($data, $code);
+				else
+					$response = Response::fromView($filename, $data, $code);
+			}
+			return $response;
+		};
+		array_unshift($this->middlewares, $middleware);
+
+		return $this;
+	}
+
 	public function add($middleware) {
 		$this->middlewares[] = $middleware;
 	}
