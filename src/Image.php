@@ -107,7 +107,7 @@ class Image {
 			$srcY = 0;
 		}
 
-		return self::resample($source, $srcX, $srcY, $srcWidth, $srcHeight, $destWidth, $destHeight, $destination, $destinationType, $rotationAngle, $quality);
+		return self::resample($source, round($srcX), round($srcY), round($srcWidth), round($srcHeight), round($destWidth), round($destHeight), $destination, $destinationType, $rotationAngle, $quality);
 	}
 
 	/**
