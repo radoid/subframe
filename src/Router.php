@@ -58,14 +58,15 @@ class Router {
 	 * Tries to dispatch the request within a namespace
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @param Cache|null $cache Optional cache if caching is desired
+	 * @return Router
 	 */
-	public function routeInNamespace(string $namespace, array $classArgs = []) {
+	public function routeInNamespace(string $namespace, array $classArgs = []): self {
 		if (($route = $this->findRouteInNamespace($namespace))) {
 			[$class, $action, $args] = $route;
 			$instance = new $class(...$classArgs);
 			self::handleRoute([$instance, $action], $args, $this->cache);
 		}
+		return $this;
 	}
 
 	/**
@@ -76,7 +77,7 @@ class Router {
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @return Router
 	 */
-	public function route(string $method, string $uri, callable $callable, array $classArgs = []): self {
+	public function route(string $method, string $uri, $callable, array $classArgs = []): self {
 		$uri = trim($uri, '/');
 
 		if ($method == $this->method && preg_match("~^$uri$~", $this->uri, $matches)) {
