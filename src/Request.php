@@ -6,10 +6,18 @@ use Exception;
 class Request {
 
 	/**
-	 * Obtains the current request URI; in case of a shell script, it's built from the script's arguments
+	 * Obtains the current request's method
 	 * @return string
 	 */
-	public static function getRequestUri(): string {
+	public static function getMethod(): string {
+		return $_SERVER['REQUEST_METHOD'] ?? 'GET';
+	}
+
+	/**
+	 * Obtains the current request's URI; in case of a shell script, it's built from the script's arguments
+	 * @return string
+	 */
+	public static function getUri(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_URI']))
 			$uri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
@@ -23,8 +31,8 @@ class Request {
 	 * Obtains the current request URI, relative to the directory the script is in, unless in case of a shell script
 	 * @return string
 	 */
-	public static function getRelativeRequestUri(): string {
-		$uri = self::getRequestUri();
+	public static function getRelativeUri(): string {
+		$uri = self::getUri();
 		$subdir = dirname($_SERVER['SCRIPT_NAME']);
 		if (isset($_SERVER['REQUEST_URI']) && $subdir != '.')
 			$uri = substr($uri, strlen($subdir));

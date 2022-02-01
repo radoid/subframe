@@ -25,7 +25,7 @@ class Router {
 	 */
 	public function __construct(?string $method = null, ?string $uri = null, ?Cache $cache = null) {
 		$this->method = $method ?? $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$this->uri = $uri ?? Request::getRelativeRequestUri();
+		$this->uri = $uri ?? Request::getRelativeUri();
 		$this->cache = $cache;
 		$this->uri = trim(strtok($this->uri, '?'), '/');
 	}
@@ -37,7 +37,7 @@ class Router {
 	 */
 	public static function fromRequestUri(?Cache $cache = null): Router {
 		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$requestUri = Request::getRequestUri();
+		$requestUri = Request::getUri();
 
 		return new Router($method, $requestUri, $cache);
 	}
