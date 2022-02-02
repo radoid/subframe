@@ -5,26 +5,53 @@ use Exception;
 
 class Request implements RequestInterface {
 
-	/** @var string */
+	/**
+	 * The request's HTTP method
+	 * @var string
+	 */
 	private $method;
 
-	/** @var string */
+	/**
+	 * The request's URI
+	 * @var string
+	 */
 	private $uri;
 
-	/** @var array */
-	private $get;
+	/**
+	 * The request's HTTP header fields
+	 * @var array
+	 */
+	private $headers;
 
-	/** @var array */
-	private $post;
+	/**
+	 * The query (GET) parameters
+	 * @var array
+	 */
+	private $queryParams;
 
-	/** @var array */
-	private $cookie;
+	/**
+	 * The POST variables
+	 * @var array
+	 */
+	private $parsedBody;
 
-	/** @var array */
+	/**
+	 * The cookies
+	 * @var array
+	 */
+	private $cookies;
+
+	/**
+	 * The uploaded files
+	 * @var array
+	 */
 	private $files;
 
-	/** @var array */
-	private $params;
+	/**
+	 * The optional parameters usually present in the $_SERVER array
+	 * @var array
+	 */
+	private $serverParams;
 
 	/**
 	 * Creates a request for the given request parameters or for the current request
@@ -35,11 +62,16 @@ class Request implements RequestInterface {
 	public function __construct(string $method, string $uri, array $get = [], array $post = [], array $cookie = [], array $files = [], array $params = []) {
 		$this->method = $method;
 		$this->uri = $uri;
-		$this->get = $get;
-		$this->post = $post;
-		$this->cookie = $cookie;
+		$this->headers = [];
+		$this->queryParams = $get;
+		$this->parsedBody = $post;
+		$this->cookies = $cookie;
 		$this->files = [];
-		$this->params = $params;
+		$this->serverParams = $params;
+
+		foreach ($params as $key => $value)
+			if (substr($key, 0, 5) == 'HTTP_')
+				$this->headers[strtr(ucwords(strtolower(substr($key, 5)), '_'), '_', '-')] = $value;
 
 		foreach ($files as $varname => $file)
 			if (is_array($file['name'])) {
@@ -80,7 +112,7 @@ class Request implements RequestInterface {
 	}
 
 	/**
-	 * Creates a request for the request from the REQUEST_URI constant
+	 * Creates a request for the request from the $_SERVER['REQUEST_URI'] variable
 	 * @return Request
 	 * @throws Exception
 	 */
@@ -89,7 +121,7 @@ class Request implements RequestInterface {
 	}
 
 	/**
-	 * Creates a request for the request from the REQUEST_URI constant, relative to the script's directory
+	 * Creates a request for the request from the $_SERVER['REQUEST_URI'] variable, but relative to the index.php script's directory
 	 * @return Request
 	 * @throws Exception
 	 */
@@ -98,7 +130,7 @@ class Request implements RequestInterface {
 	}
 
 	/**
-	 * Creates a request for the request from the PATH_INFO constant
+	 * Creates a request for the request from the $_SERVER['PATH_INFO'] variable
 	 * @return Request
 	 * @throws Exception
 	 */
@@ -106,28 +138,76 @@ class Request implements RequestInterface {
 		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getPathInfo(), $_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
 	}
 
+	/**
+	 * Request's HTTP method
+	 * @return string
+	 */
 	public function getMethod(): string {
 		return $this->method;
 	}
 
+	/**
+	 * Request's URI
+	 * @return string
+	 */
 	public function getUri(): string {
 		return $this->uri;
 	}
 
+	/**
+	 * All header fields in the request
+	 * @return string[]
+	 */
+	public function getHeaders(): array {
+		return $this->headers;
+	}
+
+	/**
+	 * Specific header field's value
+	 * @param string $name
+	 * @return string|null
+	 */
+	public function getHeader(string $name): ?string {
+		return $this->headers[$name] ?? null;
+	}
+
+	/**
+	 * All query (GET) parameters in the request
+	 * @return string[]
+	 */
+	public function getQueryParams(): array {
+		return $this->queryParams;
+	}
+
+	/**
+	 * Returns a query (GET) parameter by name
+	 * @param string|null $name
+	 * @return string|string[]|null
+	 */
 	public function get(?string $name = null) {
-		return (isset($name) ? $this->get[$name] ?? null : $this->get);
+		return (isset($name) ? $this->queryParams[$name] ?? null : $this->queryParams);
 	}
 
+	/**
+	 * Returns a (POST) variable from the body by name
+	 * @param string|null $name
+	 * @return string|string[]|null
+	 */
 	public function post(?string $name = null) {
-		return (isset($name) ? $this->post[$name] ?? null : $this->post);
+		return (isset($name) ? $this->parsedBody[$name] ?? null : $this->parsedBody);
 	}
 
+	/**
+	 * Returns an uploaded file definition by name
+	 * @param string|null $name
+	 * @return string|string[]|null
+	 */
 	public function file(string $name) {
 		return $this->files[$name] ?? null;
 	}
 
 	/**
-	 * Obtains uploaded files array in a normalized form
+	 * All uploaded files definitions in a normalized form
 	 * @return array
 	 * @throws Exception
 	 */
@@ -136,15 +216,15 @@ class Request implements RequestInterface {
 	}
 
 	/**
-	 * Remote address the request was made from
+	 * Remote address the request was made from, taking X-Forwarded-For header field into accout
 	 * @return string
 	 */
 	public function getRemoteAddr(): string {
-		if (!empty($this->params['HTTP_X_FORWARDED_FOR']))
-			foreach (explode(",", $this->params['HTTP_X_FORWARDED_FOR']) as $ipaddr)
+		if (!empty($this->serverParams['HTTP_X_FORWARDED_FOR']))
+			foreach (explode(",", $this->serverParams['HTTP_X_FORWARDED_FOR']) as $ipaddr)
 				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
 					return $ipaddr;
-		return $this->params['REMOTE_ADDR'];
+		return $this->serverParams['REMOTE_ADDR'];
 	}
 
 	/**
@@ -152,7 +232,7 @@ class Request implements RequestInterface {
 	 * @return boolean
 	 */
 	public function isAjax(): bool {
-		return ($this->params['HTTP_X_REQUESTED_WITH'] ?? '') == 'XMLHttpRequest';
+		return ($this->serverParams['HTTP_X_REQUESTED_WITH'] ?? '') == 'XMLHttpRequest';
 	}
 
 	/**
@@ -160,7 +240,7 @@ class Request implements RequestInterface {
 	 * @return boolean
 	 */
 	public function acceptsJson(): bool {
-		return strpos($this->params['HTTP_ACCEPT'], '/json') !== false;
+		return strpos($this->serverParams['HTTP_ACCEPT'], '/json') !== false;
 	}
 
 	/**
