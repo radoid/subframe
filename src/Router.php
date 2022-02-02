@@ -19,15 +19,14 @@ class Router {
 
 	/**
 	 * Creates a router for the given request parameters or for the current request
-	 * @param string|null $method HTTP method/verb
-	 * @param string|null $uri requested URI; if not specified, it's resolved automatically — from REQUEST_URI, but relative to the script's directory (to also take care of small websites that reside in a subdirectory)
+	 * @param string $method HTTP method/verb
+	 * @param string $uri requested URI
 	 * @param Cache|null $cache
 	 */
-	public function __construct(?string $method = null, ?string $uri = null, ?Cache $cache = null) {
-		$this->method = $method ?? $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$this->uri = $uri ?? Request::getRelativeUri();
+	public function __construct(string $method, string $uri, ?Cache $cache = null) {
+		$this->method = $method;
+		$this->uri = trim(strtok($uri, '?'), '/');
 		$this->cache = $cache;
-		$this->uri = trim(strtok($this->uri, '?'), '/');
 	}
 
 	/**

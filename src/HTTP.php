@@ -32,7 +32,7 @@ class HTTP {
 		$options = [
 				'method' => $method,
 				'header' => implode("\r\n", $header),
-						'content' => $body,
+				'content' => $body,
 		] + $options + [
 				'timeout' => 20,
 				'ignore_errors' => true,

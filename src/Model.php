@@ -1,11 +1,13 @@
 <?php
 namespace Subframe;
 
+use stdClass;
+
 /**
  * Implements the MVC model functionality
  * @package Subframe PHP Framework
  */
-class Model {
+class Model extends stdClass {
 
 	// Data manipulation
 
@@ -188,9 +190,9 @@ class Model {
 
 	/**
 	 * Updates the record(s) in the DB table, found by the ID(s) from the optional parameter or the object itself
-	 * @param string|string[] $id Optional value looked up in the key column
+	 * @param string|string[]|null $id Optional value looked up in the key column
 	 */
-	public function update($id = '') {
+	public function update($id = null) {
 		$id = ($id ?? $this->{static::KEY});
 		$sql = strval($this);
 		if (is_array($id) && !$id || !$sql)
@@ -297,7 +299,7 @@ class Model {
 	public static function fetchAll($q, array $params = null, $indexColumn = '') {
 		if (!$q instanceof \PDOStatement)
 			$q = self::query($q, $params);
-		$classname = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
+		$classname = (static::class != 'Subframe\\Model' ? static::class : 'stdClass');
 		if (!$indexColumn)
 			return $q->fetchAll(\PDO::FETCH_CLASS, $classname);
 		for ($objects = []; ($o = $q->fetchObject($classname)); $objects[$o->$indexColumn] = $o);
@@ -355,12 +357,12 @@ class Model {
 	 * @param string|string[] $str
 	 * @return string
 	 */
-	public static function quote($str) {
+	public static function quote($str): string {
 		if (is_array($str))
 			return implode(',', array_map([self::class, 'quote'], $str));
 		if (!self::$pdo)
-			return "'".addslashes($str)."'";
-		return self::$pdo->quote($str);
+			return "'".addslashes($str ?? '')."'";
+		return self::$pdo->quote($str ?? '');
 	}
 
 	/**

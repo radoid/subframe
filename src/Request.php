@@ -3,6 +3,9 @@ namespace Subframe;
 
 use Exception;
 
+/**
+ * Represents an HTTP request
+ */
 class Request {
 
 	/**
