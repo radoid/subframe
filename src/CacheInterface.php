@@ -2,7 +2,7 @@
 namespace Subframe;
 
 /**
- * Implements a filesystem caching mechanism
+ * Simple caching mechanism
  * @package Subframe PHP Framework
  */
 interface CacheInterface {

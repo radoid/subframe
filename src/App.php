@@ -86,20 +86,22 @@ class App {
 	}
 
 	/**
-	 * Defines an exception view, that is to be presented in case of an uncaught exception
+	 * Defines a view that is to be presented in case of an uncaught exception
 	 */
-	public function exceptionView(string $filename, array $data = []): self {
-		$middleware = function (Request $request, RequestHandlerInterface $handler) use ($filename, $data): ResponseInterface {
+	public function catchView(string $filename, array $data = []): self {
+		$middleware = function (Request $request, Closure $next) use ($filename, $data): ResponseInterface {
 			try {
-				$response = $handler->handle($request);
+				$response = $next($request);
 			} catch (\Throwable $e) {
 				$code = $e->getCode();
 				$code = ($code >= 400 && $code < 500 ? $code : 500);
-				$data = ['status' => $code, 'error' => $e->getMessage()] + $data;
+				$info = ['status' => $code, 'error' => $e->getMessage()];
+				if ($code == 500)
+					error_log('PHP exception "'.$e->getMessage().'"; stack trace: '.$e->getTraceAsString().' thrown in '.$e->getFile().', line '.$e->getLine().'; URI: '.$request->getUri());
 				if ($request->acceptsJson())
-					$response = Response::fromData($data, $code);
+					$response = Response::fromData($info, $code);
 				else
-					$response = Response::fromView($filename, $data, $code);
+					$response = Response::fromView($filename, $info + ['exception' => $e] + $data, $code);
 			}
 			return $response;
 		};
@@ -112,9 +114,9 @@ class App {
 	 * Defines a closure that is to be called in case of an uncaught exception
 	 */
 	public function catch(Closure $closure): self {
-		$middleware = function (Request $request, RequestHandlerInterface $handler) use ($closure): ResponseInterface {
+		$middleware = function (Request $request, Closure $next) use ($closure): ResponseInterface {
 			try {
-				$response = $handler->handle($request);
+				$response = $next($request);
 			} catch (\Throwable $e) {
 				$response = $closure($e);
 			}

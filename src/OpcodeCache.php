@@ -2,7 +2,7 @@
 namespace Subframe;
 
 /**
- * Implements a simple filesystem caching mechanism
+ * Implements a caching mechanism using PHP opcode cache
  * @package Subframe PHP Framework
  */
 class OpcodeCache extends FileCache {

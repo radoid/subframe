@@ -1,6 +1,9 @@
 <?php
 namespace Subframe;
 
+/**
+ * Represents a response to an HTTP request
+ */
 class Response implements ResponseInterface {
 
 	/**
@@ -25,10 +28,12 @@ class Response implements ResponseInterface {
 	/**
 	 * The constructor
 	 */
-	public function __construct(int $status = 200, array $headers = [], string $body = '') {
+	public function __construct(string $body, int $status = 200, array $headers = []) {
 		$this->status = $status;
-		$this->headers = $headers;
 		$this->body = $body;
+		$this->headers = [];
+		foreach ($headers as $name => $value)
+			$this->headers[self::capitalizeName($name)] = $value;
 	}
 
 	/**
@@ -39,10 +44,18 @@ class Response implements ResponseInterface {
 	}
 
 	/**
-	 * Returns the response's header fields
+	 * Returns all header fields in the response
 	 */
 	public function getHeaders(): array {
 		return $this->headers;
+	}
+
+	/**
+	 * Returns the header field value, if present, or null otherwise
+	 */
+	public function getHeader($name): ?string {
+		$name = self::capitalizeName($name);
+		return $this->headers[$name] ?? null;
 	}
 
 	/**
@@ -53,11 +66,20 @@ class Response implements ResponseInterface {
 	}
 
 	/**
-	 * Adds a new header field to the response
+	 * Adds a new header field to the response, returning a new instance
 	 */
-	public function addHeader(string $header): self {
-		$this->headers[] = $header;
-		return $this;
+	public function withHeader(string $name, string $value): ResponseInterface {
+		$headers = [self::capitalizeName($name) => $value] + $this->headers;
+		return new self($this->body, $this->status, $headers);
+	}
+
+	/**
+	 * Removes a header field, if present, from the response, returning a new instance
+	 */
+	public function withoutHeader(string $name): ResponseInterface {
+		$headers = $this->getHeaders();
+		unset($headers[self::capitalizeName($name)]);
+		return new self($this->body, $this->status, $headers);
 	}
 
 	/**
@@ -85,14 +107,21 @@ class Response implements ResponseInterface {
 		$output = ob_get_clean();
 		error_reporting($error_reporting);
 
-		return new Response($statusCode, [], $output);
+		return new Response($output, $statusCode, []);
 	}
 
 	/**
 	 * Creates a JSON response from an array
 	 */
 	public static function fromData(array $data = [], int $statusCode = 200): Response {
-		return new Response($statusCode, ['Content-Type: application/json; charset=utf-8'], json_encode($data));
+		return new Response(json_encode($data), $statusCode, ['Content-Type' => 'application/json; charset=utf-8']);
+	}
+
+	/**
+	 * Capitalizes a header field name properly
+	 */
+	protected static function capitalizeName(string $name): string {
+		return ucwords(strtolower($name), '-');
 	}
 
 }

@@ -37,18 +37,18 @@ class CacheMiddleware implements MiddlewareInterface {
 			if ($ifModifiedSince
 					&& ($timestamp = $this->cache->getExpiryTime($name))
 					&& $timestamp - self::TTL <= $ifModifiedSince)
-				return new Response(304);
+				return new Response('', 304);
 			// TODO Generating a 304 response MUST generate any of the following header fields that would have been sent in a 200 (OK) response to the same request: Cache-Control, Content-Location, Date, ETag, Expires, and Vary.
 
 			if (($content = $this->cache->get($name)))
-				return new Response(200, ['Last-Modified: '.date('r')], $content);
+				return new Response($content, 200, ['Last-Modified: '.date('r')]);
 		}
 
 		$response = $next->handle($request);
 
 		if ($isCachable) {
 			$this->cache->set($name, $response->getBody(), self::TTL);
-			$response->addHeader("Last-Modified: ".date("r"));
+			$response->withHeader('Last-Modified', date('r'));
 		}
 
 		return $response;

@@ -3,6 +3,9 @@ namespace Subframe;
 
 use Exception;
 
+/**
+ * Represents an HTTP request
+ */
 class Request implements RequestInterface {
 
 	/**
@@ -53,25 +56,28 @@ class Request implements RequestInterface {
 	 */
 	private $serverParams;
 
+
 	/**
 	 * Creates a request for the given request parameters or for the current request
 	 * @param string|null $method HTTP method/verb
 	 * @param string|null $uri requested URI; if not specified, it's resolved automatically — from REQUEST_URI, but relative to the script's directory (to also take care of small websites that reside in a subdirectory)
 	 * @throws Exception
 	 */
-	public function __construct(string $method, string $uri, array $get = [], array $post = [], array $cookie = [], array $files = [], array $params = []) {
+	public function __construct(string $method, string $uri, array $get = [], array $post = [], array $cookie = [], array $files = [], array $server = [], array $headers = []) {
 		$this->method = $method;
 		$this->uri = $uri;
-		$this->headers = [];
+		$this->headers = $headers;
 		$this->queryParams = $get;
 		$this->parsedBody = $post;
 		$this->cookies = $cookie;
 		$this->files = [];
-		$this->serverParams = $params;
+		$this->serverParams = $server;
 
-		foreach ($params as $key => $value)
+		foreach ($server as $key => $value)
 			if (substr($key, 0, 5) == 'HTTP_')
-				$this->headers[strtr(ucwords(strtolower(substr($key, 5)), '_'), '_', '-')] = $value;
+				$this->headers[self::capitalizeName(strtr(substr($key, 5), '_', '-'))] = $value;
+		$this->headers['Content-Type'] = $server['CONTENT_TYPE'] ?? null;
+		$this->headers['Content-Length'] = $server['CONTENT_LENGTH'] ?? null;
 
 		foreach ($files as $varname => $file)
 			if (is_array($file['name'])) {
@@ -87,7 +93,7 @@ class Request implements RequestInterface {
 			$upload_max_filesize = ini_get('upload_max_filesize');
 			$post_max_size = ini_get('post_max_size');
 
-			if ($params['CONTENT_LENGTH'] > 0 && !$post && !$files)
+			if (($server['CONTENT_LENGTH'] ?? 0) > 0 && !$post && !$files)
 				throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
 
 			foreach ($files as $file)
@@ -168,7 +174,7 @@ class Request implements RequestInterface {
 	 * @return string|null
 	 */
 	public function getHeader(string $name): ?string {
-		return $this->headers[$name] ?? null;
+		return $this->headers[self::capitalizeName($name)] ?? null;
 	}
 
 	/**
@@ -177,6 +183,14 @@ class Request implements RequestInterface {
 	 */
 	public function getQueryParams(): array {
 		return $this->queryParams;
+	}
+
+	/**
+	 * All (POST) variables from the request's body
+	 * @return string[]
+	 */
+	public function getParsedBody(): array {
+		return $this->parsedBody;
 	}
 
 	/**
@@ -198,11 +212,20 @@ class Request implements RequestInterface {
 	}
 
 	/**
+	 * Returns a cookie value, if present in the request
+	 * @param string|null $name
+	 * @return string|string[]|null
+	 */
+	public function cookie(?string $name = null) {
+		return (isset($name) ? $this->cookies[$name] ?? null : $this->cookies);
+	}
+
+	/**
 	 * Returns an uploaded file definition by name
 	 * @param string|null $name
 	 * @return string|string[]|null
 	 */
-	public function file(string $name) {
+	public function file(string $name): ?array {
 		return $this->files[$name] ?? null;
 	}
 
@@ -220,11 +243,11 @@ class Request implements RequestInterface {
 	 * @return string
 	 */
 	public function getRemoteAddr(): string {
-		if (!empty($this->serverParams['HTTP_X_FORWARDED_FOR']))
-			foreach (explode(",", $this->serverParams['HTTP_X_FORWARDED_FOR']) as $ipaddr)
+		if (!empty($this->headers['X-Forwarded-For']))
+			foreach (explode(",", $this->headers['X-Forwarded-For']) as $ipaddr)
 				if ((int)$ipaddr != 10 && (int)$ipaddr != 192 && (int)$ipaddr != 127)
 					return $ipaddr;
-		return $this->serverParams['REMOTE_ADDR'];
+		return $this->serverParams['REMOTE_ADDR'] ?? '';
 	}
 
 	/**
@@ -240,7 +263,7 @@ class Request implements RequestInterface {
 	 * @return boolean
 	 */
 	public function acceptsJson(): bool {
-		return strpos($this->serverParams['HTTP_ACCEPT'], '/json') !== false;
+		return strpos($this->headers['Accept'] ?? '', '/json') !== false;
 	}
 
 	/**
@@ -282,6 +305,13 @@ class Request implements RequestInterface {
 			$uri = '/'.join('/', array_slice($argv, 1));
 
 		return $uri;
+	}
+
+	/**
+	 * Capitalizes a header field name properly
+	 */
+	protected static function capitalizeName(string $name): string {
+		return ucwords(strtolower($name), '-');
 	}
 
 }

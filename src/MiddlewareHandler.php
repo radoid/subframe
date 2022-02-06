@@ -17,7 +17,7 @@ class MiddlewareHandler implements RequestHandlerInterface {
 		if ($current instanceof MiddlewareInterface)
 			$response = $current->process($request, $next);
 		else
-			$response = $current($request, $next);
+			$response = $current($request, function ($request) use ($next) {return $next->handle($request);});
 
 		return $response;
 	}

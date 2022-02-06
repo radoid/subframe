@@ -121,11 +121,11 @@ class Router {
 		if ($result instanceof Response)
 			$response = $result;
 		elseif (is_string($result))
-			$response = new Response($status, $headers, $result);
+			$response = new Response($result, $status, $headers);
 		elseif (is_array($result) || is_object($result))
-			$response = new Response($status, array_merge($headers, ['Content-Type: application/json; charset=utf-8']), json_encode($result));
+			$response = new Response(json_encode($result), $status, array_merge($headers, ['Content-Type: application/json; charset=utf-8']));
 		elseif ($result !== false)
-			$response = new Response($status, $headers, $output);
+			$response = new Response($output, $status, $headers);
 		else
 			$response = null;
 
