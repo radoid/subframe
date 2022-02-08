@@ -6,11 +6,9 @@ class FileTest extends \PHPUnit\Framework\TestCase {
 
 	private const ROOT = __DIR__.'/files';
 
-	public function setUp() {
-		@unlink(self::ROOT.'/a/b/c/d.txt');
-		@rmdir(self::ROOT.'/a/b/c');
-		@rmdir(self::ROOT.'/a/b');
-		@rmdir(self::ROOT.'/a');
+	public function setUp(): void {
+		if (is_dir(self::ROOT.'/a'))
+			File::rmdir(self::ROOT.'/a');
 	}
 
 	public function testUnique() {
@@ -31,6 +29,9 @@ class FileTest extends \PHPUnit\Framework\TestCase {
 		$unique3 = File::unique($path, $mode);
 		$this->assertNotEquals($unique1, $unique3);
 		$this->assertNotEquals($unique2, $unique3);
+
+		$this->assertTrue(File::rmdir(self::ROOT.'/a'));
+		$this->assertFalse(is_dir(self::ROOT.'/a'));
 	}
 
 	public function testUniqueUri() {
@@ -51,6 +52,9 @@ class FileTest extends \PHPUnit\Framework\TestCase {
 		$unique3 = File::uniqueUri(self::ROOT, $uri, $mode);
 		$this->assertNotEquals($unique1, $unique3);
 		$this->assertNotEquals($unique2, $unique3);
+
+		$this->assertTrue(File::rmdir(self::ROOT.'/a'));
+		$this->assertFalse(is_dir(self::ROOT.'/a'));
 	}
 
 }

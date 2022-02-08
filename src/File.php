@@ -68,7 +68,7 @@ class File {
 	 * @param string $content
 	 * @return void
 	 */
-	public function replace(string $path, string $content) {
+	static public function replace(string $path, string $content) {
 		// If the path already exists and is a symlink, get the real path...
 		clearstatcache(true, $path);
 
@@ -82,6 +82,24 @@ class File {
 		file_put_contents($tempPath, $content);
 
 		rename($tempPath, $path);
+	}
+
+	/**
+	 * Removes a directory, recursively
+	 */
+	static public function rmdir(string $dir): bool {
+		if (!($dir = realpath($dir)))
+			return false;
+		foreach (scandir($dir) as $filename)
+			if ($filename != '.' && $filename != '..')
+				if (is_dir($path = "$dir/$filename") && !is_link($path)) {
+					if (!self::rmdir($path))
+						return false;
+				} else
+					if (!unlink($path))
+						return false;
+
+		return rmdir($dir);
 	}
 
 }
