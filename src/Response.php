@@ -28,12 +28,19 @@ class Response implements ResponseInterface {
 	/**
 	 * The constructor
 	 */
-	public function __construct(string $body, int $status = 200, array $headers = []) {
-		$this->status = $status;
+	public function __construct(string $body, int $statusCode = 200, array $headers = []) {
+		$this->status = $statusCode;
 		$this->body = $body;
 		$this->headers = [];
 		foreach ($headers as $name => $value)
 			$this->headers[self::capitalizeName($name)] = $value;
+	}
+
+	/**
+	 * Constructs a Response with only "Location" header field
+	 */
+	public static function fromLocation(string $location, int $statusCode = 302): self {
+		return new self('', $statusCode, ['Location' => $location]);
 	}
 
 	/**
