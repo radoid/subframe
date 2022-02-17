@@ -94,9 +94,20 @@ class Response implements ResponseInterface {
 	 */
 	public function output(): void {
 		http_response_code($this->status);
-		foreach ($this->headers as $header)
-			header($header);
+
+		if (!headers_sent())
+			foreach ($this->headers as $name => $value)
+				header("$name: $value");
+
 		echo $this->body;
+
+		if (function_exists('fastcgi_finish_request'))
+			fastcgi_finish_request();
+		elseif (function_exists('litespeed_finish_request'))
+			litespeed_finish_request();
+		else
+			while(ob_get_level())
+				ob_end_flush();
 	}
 
 	/**

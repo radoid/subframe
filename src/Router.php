@@ -112,20 +112,17 @@ class Router {
 	 * Executes given callable and returns a Response made from its output
 	 */
 	protected static function captureCallable(callable $callable, array $args): ?Response {
-		ob_start();
 		$result = call_user_func_array($callable, $args);
-		$output = ob_get_clean();
-		$headers = headers_list();
 		$status = http_response_code();
 
 		if ($result instanceof Response)
 			$response = $result;
 		elseif (is_string($result))
-			$response = new Response($result, $status, $headers);
+			$response = new Response($result, $status, []);
 		elseif (is_array($result) || is_object($result))
-			$response = new Response(json_encode($result), $status, array_merge($headers, ['Content-Type: application/json; charset=utf-8']));
+			$response = new Response(json_encode($result), $status, ['Content-Type' => 'application/json; charset=utf-8']);
 		elseif ($result !== false)
-			$response = new Response($output, $status, $headers);
+			$response = new Response('', $status, []);
 		else
 			$response = null;
 
