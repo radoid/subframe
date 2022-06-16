@@ -92,7 +92,7 @@ class Response implements ResponseInterface {
 	/**
 	 * Outputs the response, both header fields and the body
 	 */
-	public function output(): void {
+	public function send(): void {
 		http_response_code($this->status);
 
 		if (!headers_sent())

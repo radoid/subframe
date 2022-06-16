@@ -39,7 +39,7 @@ interface ResponseInterface {
 	/**
 	 * Outputs the response, both header fields and the body
 	 */
-	public function output(): void;
+	public function send(): void;
 
 	/**
 	 * Creates a response from a view

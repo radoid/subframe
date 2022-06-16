@@ -96,24 +96,25 @@ class Request implements RequestInterface {
 			if (($server['CONTENT_LENGTH'] ?? 0) > 0 && !$post && !$files)
 				throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
 
-			foreach ($files as $file)
-				if ($file['error'])
-					switch ($file['error']) {
-						case UPLOAD_ERR_INI_SIZE:
-							throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
-						case UPLOAD_ERR_FORM_SIZE:
-							throw new Exception("\"$file[name]\" is too big.", 400);
-						case UPLOAD_ERR_PARTIAL:
-							throw new Exception("\"$file[name]\" was not uploaded.", 500);
-						case UPLOAD_ERR_NO_TMP_DIR:
-							throw new Exception('No tmp directory.', 500);
-						case UPLOAD_ERR_CANT_WRITE:
-							throw new Exception('Write error.', 500);
-						case UPLOAD_ERR_EXTENSION:
-							throw new Exception('File extension is not allowed.', 500);
-						default:
-							throw new Exception("Upload failed (error $file[error]).", 500);
-					}
+			foreach ($this->files as $varname => $files)
+				foreach ($files as $file)
+					if ($file['error'])
+						switch ($file['error']) {
+							case UPLOAD_ERR_INI_SIZE:
+								throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
+							case UPLOAD_ERR_FORM_SIZE:
+								throw new Exception("\"$file[name]\" is too big.", 400);
+							case UPLOAD_ERR_PARTIAL:
+								throw new Exception("\"$file[name]\" was not uploaded.", 500);
+							case UPLOAD_ERR_NO_TMP_DIR:
+								throw new Exception('No tmp directory.', 500);
+							case UPLOAD_ERR_CANT_WRITE:
+								throw new Exception('Write error.', 500);
+							case UPLOAD_ERR_EXTENSION:
+								throw new Exception('File extension is not allowed.', 500);
+							default:
+								throw new Exception("Upload failed (error $file[error]).", 500);
+						}
 		}
 	}
 

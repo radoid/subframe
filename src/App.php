@@ -93,7 +93,7 @@ class App {
 			try {
 				$response = $next($request);
 			} catch (\Throwable $e) {
-				$code = $e->getCode();
+				$code = intval($e->getCode());
 				$code = ($code >= 400 && $code < 500 ? $code : 500);
 				$info = ['status' => $code, 'error' => $e->getMessage()];
 				if ($code == 500)
@@ -161,7 +161,7 @@ class App {
 	public function handle(RequestInterface $request) {
 		$handler = new MiddlewareHandler(array_merge($this->middlewares, [$this->router]));
 		$response = $handler->handle($request);
-		$response->output();
+		$response->send();
 	}
 
 }

@@ -41,7 +41,7 @@ class ResponseTest extends TestCase {
 
 	public function testOutput() {
 		ob_start();
-		@$this->response->output();
+		@$this->response->send();
 		$body = ob_get_clean();
 		$status = http_response_code();
 		//$headers = getallheaders();

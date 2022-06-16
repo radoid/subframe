@@ -27,7 +27,7 @@ class Image {
 		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 
-		ini_set('memory_limit', '256M');
+		ini_set('memory_limit', '-1');
 		ini_set('gd.jpeg_ignore_warning', 1);
 
 		if ($type == IMAGETYPE_GIF)
@@ -124,7 +124,7 @@ class Image {
 		if (!$initialWidth || !$initialHeight || !$type)
 			return false;
 
-		ini_set("memory_limit", "256M");
+		ini_set("memory_limit", "-1");
 		ini_set('gd.jpeg_ignore_warning', 1);
 
 		if ($type == IMAGETYPE_GIF)
