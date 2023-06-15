@@ -10,112 +10,60 @@ class Request implements RequestInterface {
 
 	/**
 	 * The request's HTTP method
-	 * @var string
 	 */
-	private $method;
+	private string $method;
 
 	/**
-	 * The request's URI
-	 * @var string
+	 * The request's URI, without trailing slash and query parameters
 	 */
-	private $uri;
+	private string $uri;
 
 	/**
 	 * The request's HTTP header fields
-	 * @var array
 	 */
-	private $headers;
+	private array $headers;
 
 	/**
 	 * The query (GET) parameters
-	 * @var array
 	 */
-	private $queryParams;
+	private array $queryParams;
 
 	/**
 	 * The POST variables
-	 * @var array
 	 */
-	private $parsedBody;
+	private array $parsedBody;
 
 	/**
 	 * The cookies
-	 * @var array
 	 */
-	private $cookies;
+	private array $cookies;
 
 	/**
 	 * The uploaded files
-	 * @var array
 	 */
-	private $files;
+	private array $files;
 
 	/**
 	 * The optional parameters usually present in the $_SERVER array
-	 * @var array
 	 */
-	private $serverParams;
+	private array $serverParams;
 
 
 	/**
 	 * Creates a request for the given request parameters or for the current request
-	 * @param string|null $method HTTP method/verb
-	 * @param string|null $uri requested URI; if not specified, it's resolved automatically — from REQUEST_URI, but relative to the script's directory (to also take care of small websites that reside in a subdirectory)
+	 * @param string $method HTTP method/verb
+	 * @param string $uri requested URI
 	 * @throws Exception
 	 */
 	public function __construct(string $method, string $uri, array $get = [], array $post = [], array $cookie = [], array $files = [], array $server = [], array $headers = []) {
 		$this->method = $method;
-		$this->uri = $uri;
+		$this->uri = '/'.trim(strtok($uri, '?'), '/');
 		$this->headers = $headers;
 		$this->queryParams = $get;
 		$this->parsedBody = $post;
 		$this->cookies = $cookie;
-		$this->files = [];
+		$this->files = $files;
 		$this->serverParams = $server;
-
-		foreach ($server as $key => $value)
-			if (substr($key, 0, 5) == 'HTTP_')
-				$this->headers[self::capitalizeName(strtr(substr($key, 5), '_', '-'))] = $value;
-		$this->headers['Content-Type'] = $server['CONTENT_TYPE'] ?? null;
-		$this->headers['Content-Length'] = $server['CONTENT_LENGTH'] ?? null;
-
-		foreach ($files as $varname => $file)
-			if (is_array($file['name'])) {
-				foreach ($file as $key => $array)
-					foreach ($array as $i => $value)
-						if ($file['error'][$i] != UPLOAD_ERR_NO_FILE)
-							$this->files[$varname][$i][$key] = $value;
-			} else
-				if ($file['error'] != UPLOAD_ERR_NO_FILE)
-					$this->files[$varname][] = $file;
-
-		if ($method == 'POST') {
-			$upload_max_filesize = ini_get('upload_max_filesize');
-			$post_max_size = ini_get('post_max_size');
-
-			if (($server['CONTENT_LENGTH'] ?? 0) > 0 && !$post && !$files)
-				throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
-
-			foreach ($this->files as $varname => $files)
-				foreach ($files as $file)
-					if ($file['error'])
-						switch ($file['error']) {
-							case UPLOAD_ERR_INI_SIZE:
-								throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
-							case UPLOAD_ERR_FORM_SIZE:
-								throw new Exception("\"$file[name]\" is too big.", 400);
-							case UPLOAD_ERR_PARTIAL:
-								throw new Exception("\"$file[name]\" was not uploaded.", 500);
-							case UPLOAD_ERR_NO_TMP_DIR:
-								throw new Exception('No tmp directory.', 500);
-							case UPLOAD_ERR_CANT_WRITE:
-								throw new Exception('Write error.', 500);
-							case UPLOAD_ERR_EXTENSION:
-								throw new Exception('File extension is not allowed.', 500);
-							default:
-								throw new Exception("Upload failed (error $file[error]).", 500);
-						}
-		}
 	}
 
 	/**
@@ -123,8 +71,8 @@ class Request implements RequestInterface {
 	 * @return Request
 	 * @throws Exception
 	 */
-	public static function fromRequestUri(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getRequestUri(), $_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
+	public static function fromGlobalRequestUri(): self {
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRequestUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, self::getGlobalHeaders());
 	}
 
 	/**
@@ -132,8 +80,8 @@ class Request implements RequestInterface {
 	 * @return Request
 	 * @throws Exception
 	 */
-	public static function fromRelativeRequestUri(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getRelativeRequestUri(), $_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
+	public static function fromGlobalRelativeUri(): self {
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRelativeUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, self::getGlobalHeaders());
 	}
 
 	/**
@@ -141,8 +89,8 @@ class Request implements RequestInterface {
 	 * @return Request
 	 * @throws Exception
 	 */
-	public static function fromPathInfo(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getPathInfo(), $_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
+	public static function fromGlobalPathInfo(): self {
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalPathInfo(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, self::getGlobalHeaders());
 	}
 
 	/**
@@ -155,7 +103,6 @@ class Request implements RequestInterface {
 
 	/**
 	 * Request's URI
-	 * @return string
 	 */
 	public function getUri(): string {
 		return $this->uri;
@@ -180,7 +127,6 @@ class Request implements RequestInterface {
 
 	/**
 	 * All query (GET) parameters in the request
-	 * @return string[]
 	 */
 	public function getQueryParams(): array {
 		return $this->queryParams;
@@ -188,14 +134,13 @@ class Request implements RequestInterface {
 
 	/**
 	 * All (POST) variables from the request's body
-	 * @return string[]
 	 */
 	public function getParsedBody(): array {
 		return $this->parsedBody;
 	}
 
 	/**
-	 * Returns a query (GET) parameter by name
+	 * Returns a query (GET) parameter by name, or all parameters
 	 * @param string|null $name
 	 * @return string|string[]|null
 	 */
@@ -204,7 +149,7 @@ class Request implements RequestInterface {
 	}
 
 	/**
-	 * Returns a (POST) variable from the body by name
+	 * Returns a (POST) variable from the body by name, or all variables
 	 * @param string|null $name
 	 * @return string|string[]|null
 	 */
@@ -269,9 +214,8 @@ class Request implements RequestInterface {
 
 	/**
 	 * Obtains the current request URI; in case of a shell script, it's built from the script's arguments
-	 * @return string
 	 */
-	public static function getRequestUri(): string {
+	private static function getGlobalRequestUri(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_URI']))
 			$uri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
@@ -283,10 +227,9 @@ class Request implements RequestInterface {
 
 	/**
 	 * Obtains the current request URI, relative to the directory the script is in, unless in case of a shell script
-	 * @return string
 	 */
-	public static function getRelativeRequestUri(): string {
-		$uri = self::getRequestUri();
+	private static function getGlobalRelativeUri(): string {
+		$uri = self::getGlobalRequestUri();
 		$subdir = dirname($_SERVER['SCRIPT_NAME']);
 		if (isset($_SERVER['REQUEST_URI']) && $subdir != '.')
 			$uri = substr($uri, strlen($subdir));
@@ -296,9 +239,8 @@ class Request implements RequestInterface {
 
 	/**
 	 * Obtains the current PATH_INFO variable; in case of a shell script, it's built from the script's arguments
-	 * @return string
 	 */
-	public static function getPathInfo(): string {
+	private static function getGlobalPathInfo(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_METHOD'])) {
 			$uri = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
@@ -306,6 +248,60 @@ class Request implements RequestInterface {
 			$uri = '/'.join('/', array_slice($argv, 1));
 
 		return $uri;
+	}
+
+	private static function getGlobalHeaders(): array {
+		$headers = [];
+		foreach ($_SERVER as $key => $value)
+			if (substr($key, 0, 5) == 'HTTP_')
+				$headers[self::capitalizeName(strtr(substr($key, 5), '_', '-'))] = $value;
+		$headers['Content-Type'] = $_SERVER['CONTENT_TYPE'] ?? null;
+		$headers['Content-Length'] = $_SERVER['CONTENT_LENGTH'] ?? null;
+
+		return $headers;
+	}
+
+	private static function getGlobalUploadedFiles(): array {
+		$files = [];
+		foreach ($_FILES as $varname => $file)
+			if (is_array($file['name'])) {
+				foreach ($file as $key => $array)
+					foreach ($array as $i => $value)
+						if ($file['error'][$i] != UPLOAD_ERR_NO_FILE)
+							$files[$varname][$i][$key] = $value;
+			} else
+				if ($file['error'] != UPLOAD_ERR_NO_FILE)
+					$files[$varname][] = $file;
+
+		if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+			$upload_max_filesize = ini_get('upload_max_filesize');
+			$post_max_size = ini_get('post_max_size');
+
+			if (($server['CONTENT_LENGTH'] ?? 0) > 0 && !$_POST && !$_FILES)
+				throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
+
+			foreach ($files as $varname => $files)
+				foreach ($files as $file)
+					if ($file['error'])
+						switch ($file['error']) {
+							case UPLOAD_ERR_INI_SIZE:
+								throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
+							case UPLOAD_ERR_FORM_SIZE:
+								throw new Exception("\"$file[name]\" is too big.", 400);
+							case UPLOAD_ERR_PARTIAL:
+								throw new Exception("\"$file[name]\" was not uploaded.", 500);
+							case UPLOAD_ERR_NO_TMP_DIR:
+								throw new Exception('No tmp directory.', 500);
+							case UPLOAD_ERR_CANT_WRITE:
+								throw new Exception('Write error.', 500);
+							case UPLOAD_ERR_EXTENSION:
+								throw new Exception('File extension is not allowed.', 500);
+							default:
+								throw new Exception("Upload failed (error $file[error]).", 500);
+						}
+		}
+		
+		return $files;
 	}
 
 	/**

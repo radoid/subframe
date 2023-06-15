@@ -1,11 +1,13 @@
 <?php
 namespace Subframe;
 
+use stdClass;
+
 /**
  * Implements the MVC model functionality
  * @package Subframe PHP Framework
  */
-class Model {
+class Model extends stdClass {
 
 	// Data manipulation
 

@@ -1,23 +1,44 @@
 <?php
 namespace Subframe;
 
+use Closure;
+use Exception;
+
 class MiddlewareHandler implements RequestHandlerInterface {
 
-	private $middlewares;
+	/**
+	 * The middleware stack
+	 */
+	private array $middlewares;
 
+
+	/**
+	 * The constructor
+	 */
 	public function __construct(array $middlewares) {
 		$this->middlewares = $middlewares;
 	}
 
+	/**
+	 * Adds another middleware to the stack
+	 * @param MiddlewareInterface|Closure $middleware
+	 */
+	public function add($middleware) {
+		array_push($this->middlewares, $middleware);
+	}
+
+	/**
+	 * Processes the given request
+	 * @throws Exception
+	 */
 	public function handle(RequestInterface $request): ResponseInterface {
 		if (!$this->middlewares)
 			throw new \Exception('Middleware stack is empty.', 500);
-		$current = $this->middlewares[0];
-		$next = new MiddlewareHandler(array_slice($this->middlewares, 1));
+		$current = array_pop($this->middlewares);
 		if ($current instanceof MiddlewareInterface)
-			$response = $current->process($request, $next);
+			$response = $current->process($request, $this);
 		else
-			$response = $current($request, function ($request) use ($next) {return $next->handle($request);});
+			$response = $current($request, function ($request) { return $this->handle($request); });
 
 		return $response;
 	}

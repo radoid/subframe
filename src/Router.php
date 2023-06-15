@@ -8,59 +8,60 @@ namespace Subframe;
 class Router {
 
 	/**
-	 * The handled request
-	 * @var Request
+	 * All defined routes
+	 * @var array[]
 	 */
-	protected $request;
-
-	/**
-	 * The method of the handled request
-	 * @var string
-	 */
-	protected $method;
-
-	/**
-	 * The URI of the handled request
-	 * @var string
-	 */
-	protected $uri;
+	private array $routes = [];
 
 
 	/**
-	 * Creates a router for the given request parameters or for the current request
-	 * @param Request|null $request
+	 * Adds a route defined with 3 components
 	 */
-	public function __construct(?Request $request = null) {
-		$this->request = $request ?? Request::fromRelativeRequestUri();
-		$this->method = $this->request->getMethod();
-		$this->uri = trim(strtok($this->request->getUri(), '?'), '/');
+	public function addRoute(string $method, string $uri, $action, array $classArgs = []): void {
+		$this->routes[] = [$method, $uri, $action, $classArgs];
 	}
 
 	/**
-	 * Creates a router for the request from the REQUEST_URI constant
-	 * @return Router
+	 * Adds a view route, only presenting the given view
 	 */
-	public static function fromRequestUri(): self {
-		return new self(Request::fromRequestUri());
+	public function addView(string $uri, string $filename, array $data = []): void {
+		$this->routes[] = [null, $uri, $filename, $data];
 	}
 
 	/**
-	 * Creates a router for the request from the PATH_INFO constant
-	 * @return Router
+	 * Adds a namespace with its classes as routes
 	 */
-	public static function fromPathInfo(): self {
-		return new self(Request::fromPathInfo());
+	public function addNamespace(string $namespace, array $classArgs = []): void {
+		$this->routes[] = [null, null, $namespace, $classArgs];
 	}
 
 	/**
-	 * Tries to dispatch the request within a namespace
+	 * Tries to dispatch the given request among defined routes, returns one's Response if found
+	 */
+	public function handle(Request $request): ?Response {
+		foreach ($this->routes as [$method, $uri, $action, $classArgs]) {
+			if ($method)
+				$response = $this->captureRoute($request, $method, $uri, $action, $classArgs);
+			elseif ($uri !== null)
+				$response = $this->captureViewRoute($request, $uri, $action, $classArgs);
+			else
+				$response = $this->captureRouteInNamespace($request, $action, $classArgs);
+			if ($response)
+				return $response;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Tries to dispatch the given request within a namespace, returns route's Response if found
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 */
-	public function captureRouteInNamespace(string $namespace, array $classArgs = []): ?Response {
-		if (($route = $this->findRouteInNamespace($namespace))) {
+	private function captureRouteInNamespace(Request $request, string $namespace, array $classArgs = []): ?Response {
+		if (($route = $this->findRouteInNamespace($request, $namespace))) {
 			[$class, $action, $args] = $route;
-			$instance = new $class($this->request, ...$classArgs);
+			$instance = new $class($request, ...$classArgs);
 			$response = self::captureCallable([$instance, $action], $args);
 		} else
 			$response = null;
@@ -69,21 +70,19 @@ class Router {
 	}
 
 	/**
-	 * Tries to match a route to the request, and returns given callable's response if successful
+	 * Tries to match a route to the given request, and returns the provided callable's response if matched
 	 * @param string $method The HTTP request method
-	 * @param string $uri The URI for the route
+	 * @param string $uri The URI for the route, without trailing slash or query parameters
 	 * @param mixed $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @return ?Response
 	 */
-	public function captureRoute(string $method, string $uri, $callable, array $classArgs = []): ?Response {
-		$uri = trim($uri, '/');
-
-		if ($method == $this->method && preg_match("~^$uri$~", $this->uri, $matches)) {
+	private function captureRoute(Request $request, string $method, string $uri, $callable, array $classArgs = []): ?Response {
+		if ($method == $request->getMethod() && preg_match("~^$uri$~", $request->getUri(), $matches)) {
 			if (is_string($callable) && strpos($callable, '@') !== false)
 				$callable = explode('@', $callable);
 			if (is_array($callable) && is_string($callable[0]))
-				$callable[0] = new $callable[0]($this->request, ...$classArgs);
+				$callable[0] = new $callable[0]($request, ...$classArgs);
 			$args = array_slice($matches, 1);
 
 			$response = self::captureCallable($callable, $args);
@@ -94,13 +93,12 @@ class Router {
 	}
 
 	/**
-	 * Tries to match a route to the request, and returns a view as a response if successful
-	 * @return ?Response
+	 * Tries to match a route to the request, and returns its response if matched
 	 */
-	public function captureViewRoute(string $uri, string $filename, array $data = []): ?Response {
+	private function captureViewRoute(Request $request, string $uri, string $filename, array $data = []): ?Response {
 		$uri = trim($uri, '/');
 
-		if ($this->method == 'GET' && $uri == $this->uri)
+		if ($request->getMethod() == 'GET' && $uri == $request->getUri())
 			$response = Response::fromView($filename, $data);
 		else
 			$response = null;
@@ -111,7 +109,7 @@ class Router {
 	/**
 	 * Executes given callable and returns a Response made from its output
 	 */
-	protected static function captureCallable(callable $callable, array $args): ?Response {
+	private static function captureCallable(callable $callable, array $args): ?Response {
 		$result = call_user_func_array($callable, $args);
 		$status = http_response_code();
 
@@ -131,11 +129,11 @@ class Router {
 
 	/**
 	 * Tries to find a route within a namespace
-	 * @param string $namespace
-	 * @return array|null
 	 */
-	public function findRouteInNamespace(string $namespace): ?array {
-		$argv = ($this->uri !== '' ? explode('/', $this->uri) : []);
+	public function findRouteInNamespace(Request $request, string $namespace): ?array {
+		$method = $request->getMethod();
+		$uri = trim($request->getUri(), '/');
+		$argv = ($uri !== '' ? explode('/', $uri) : []);
 		$argc = count($argv);
 
 		$classv = [$namespace];
@@ -143,11 +141,11 @@ class Router {
 		for ($i = $argc; $i >= 0; $i--) {
 			$class = join('\\', array_slice($classv, 0, 1+$i));
 			if (class_exists($found = $class.'\\Home'))
-				if (($route = self::findRouteInClass($found, $this->method, array_slice($argv, $i))))
+				if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
 					return $route;
 			if ($i > 0)
 				if (class_exists($found = $class))
-					if (($route = self::findRouteInClass($found, $this->method, array_slice($argv, $i))))
+					if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
 						return $route;
 		}
 
@@ -192,7 +190,7 @@ class Router {
 			try {
 				$r = new \ReflectionClass($classname);
 				$m = $r->getMethod($route[1]);
-				if ($m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
+				if ($m->isPublic() && $m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
 					return $route;
 			}
 			catch (\Throwable $ignored) {}

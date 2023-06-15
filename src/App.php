@@ -2,6 +2,7 @@
 namespace Subframe;
 
 use Closure;
+use Exception;
 
 /**
  * Represents the outermost layer of the application, allowing for middleware and routes definition
@@ -9,24 +10,28 @@ use Closure;
 class App {
 
 	/**
-	 * The middleware stack
-	 * @var array
-	 */
-	private $middlewares;
-
-	/**
 	 * The router
-	 * @var Router
 	 */
-	private $router;
+	private Router $router;
+
+ 	private MiddlewareHandler $middlewareHandler;
 
 
 	/**
 	 * The constructor
+	 * @param array $middlewares The middleware stack
 	 */
 	public function __construct(array $middlewares = []) {
-		$this->router = new RouterMiddleware;
-		$this->middlewares = $middlewares;
+		$this->router = new Router();
+
+		$routerMiddleware = function (Request $request, Closure $next): ResponseInterface {
+			$response = $this->router->handle($request);
+			if ($response)
+				return $response;
+			throw new Exception('Route not found.', 404);
+		};
+
+		$this->middlewareHandler = new MiddlewareHandler(array_merge([$routerMiddleware], $middlewares));
 	}
 
 	/**
@@ -93,19 +98,18 @@ class App {
 			try {
 				$response = $next($request);
 			} catch (\Throwable $e) {
-				$code = intval($e->getCode());
-				$code = ($code >= 400 && $code < 500 ? $code : 500);
-				$info = ['status' => $code, 'error' => $e->getMessage()];
+				$code = $e->getCode();
+				$code = (is_numeric($code) && $code >= 400 && $code < 500 ? $code : 500);
 				if ($code == 500)
 					error_log('PHP exception "'.$e->getMessage().'"; stack trace: '.$e->getTraceAsString().' thrown in '.$e->getFile().', line '.$e->getLine().'; URI: '.$request->getUri());
 				if ($request->acceptsJson())
-					$response = Response::fromData($info, $code);
+					$response = Response::fromData(['error' => $e->getMessage()], $code);
 				else
-					$response = Response::fromView($filename, $info + ['exception' => $e] + $data, $code);
+					$response = Response::fromView($filename, ['error' => $e->getMessage()] + $data, $code);
 			}
 			return $response;
 		};
-		array_unshift($this->middlewares, $middleware);
+		$this->middlewareHandler->add($middleware);
 
 		return $this;
 	}
@@ -122,45 +126,44 @@ class App {
 			}
 			return $response;
 		};
-		array_unshift($this->middlewares, $middleware);
+		$this->middlewareHandler->add($middleware);
 
 		return $this;
 	}
 
 	/**
-	 * Adds a middleware to the middleware stack
+	 * Adds another middleware to the middleware stack
 	 */
-	public function add($middleware) {
-		$this->middlewares[] = $middleware;
+	public function add(MiddlewareInterface $middleware) {
+		$this->middlewareHandler->add($middleware);
 	}
 
 	/**
 	 * Starts processing of the request taken from the $_SERVER['REQUEST_URI'] variable
 	 */
 	public function handleRequestUri() {
-		$this->handle(Request::fromRequestUri());
+		$this->handle(Request::fromGlobalRequestUri());
 	}
 
 	/**
 	 * Starts processing of the request taken from the $_SERVER['REQUEST_URI'] variable, but relative to the index.php script
 	 */
 	public function handleRelativeRequestUri() {
-		$this->handle(Request::fromRelativeRequestUri());
+		$this->handle(Request::fromGlobalRelativeUri());
 	}
 
 	/**
 	 * Starts processing of the request taken from the $_SERVER['PATH_INFO'] variable
 	 */
 	public function handlePathInfo() {
-		$this->handle(Request::fromPathInfo());
+		$this->handle(Request::fromGlobalPathInfo());
 	}
 
 	/**
 	 * Starts processing of the given request
 	 */
 	public function handle(RequestInterface $request) {
-		$handler = new MiddlewareHandler(array_merge($this->middlewares, [$this->router]));
-		$response = $handler->handle($request);
+		$response = $this->middlewareHandler->handle($request);
 		$response->send();
 	}
 
