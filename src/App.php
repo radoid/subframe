@@ -92,8 +92,10 @@ class App {
 
 	/**
 	 * Defines a view that is to be presented in case of an uncaught exception
+	 * Specific views can be designated for specific exception codes, by providing an array with codes as keys
+	 * @param string|array $filename The view's filename
 	 */
-	public function catchView(string $filename, array $data = []): self {
+	public function catchView(mixed $filename, array $data = []): self {
 		$middleware = function (Request $request, Closure $next) use ($filename, $data): ResponseInterface {
 			try {
 				$response = $next($request);
@@ -102,6 +104,8 @@ class App {
 				$code = (is_numeric($code) && $code >= 400 && $code < 500 ? $code : 500);
 				if ($code == 500)
 					error_log('PHP exception "'.$e->getMessage().'"; stack trace: '.$e->getTraceAsString().' thrown in '.$e->getFile().', line '.$e->getLine().'; URI: '.$request->getUri());
+				if (is_array($filename))
+					$filename = $filename[$code] ?? $filename[0] ?? null;
 				if ($request->acceptsJson())
 					$response = Response::fromData(['error' => $e->getMessage()], $code);
 				else
