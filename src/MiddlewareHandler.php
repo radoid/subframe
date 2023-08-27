@@ -23,7 +23,7 @@ class MiddlewareHandler implements RequestHandlerInterface {
 	 * Adds another middleware to the stack
 	 * @param MiddlewareInterface|Closure $middleware
 	 */
-	public function add($middleware) {
+	public function add($middleware): void {
 		array_push($this->middlewares, $middleware);
 	}
 

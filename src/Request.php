@@ -14,7 +14,7 @@ class Request implements RequestInterface {
 	private string $method;
 
 	/**
-	 * The request's URI, without trailing slash and query parameters
+	 * The request's URI
 	 */
 	private string $uri;
 
@@ -72,7 +72,7 @@ class Request implements RequestInterface {
 	 * @throws Exception
 	 */
 	public static function fromGlobalRequestUri(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRequestUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, self::getGlobalHeaders());
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRequestUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, getallheaders());
 	}
 
 	/**
@@ -81,7 +81,7 @@ class Request implements RequestInterface {
 	 * @throws Exception
 	 */
 	public static function fromGlobalRelativeUri(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRelativeUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, self::getGlobalHeaders());
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRelativeUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, getallheaders());
 	}
 
 	/**
@@ -90,7 +90,7 @@ class Request implements RequestInterface {
 	 * @throws Exception
 	 */
 	public static function fromGlobalPathInfo(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalPathInfo(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, self::getGlobalHeaders());
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalPathInfo(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, getallheaders());
 	}
 
 	/**
@@ -102,7 +102,7 @@ class Request implements RequestInterface {
 	}
 
 	/**
-	 * Request's URI
+	 * Request's URI, including possible trailing slash and query parameters
 	 */
 	public function getUri(): string {
 		return $this->uri;
@@ -122,7 +122,8 @@ class Request implements RequestInterface {
 	 * @return string|null
 	 */
 	public function getHeader(string $name): ?string {
-		return $this->headers[self::capitalizeName($name)] ?? null;
+		$name = ucwords(strtolower($name), '-');
+		return $this->headers[$name] ?? null;
 	}
 
 	/**
@@ -250,17 +251,9 @@ class Request implements RequestInterface {
 		return $uri;
 	}
 
-	private static function getGlobalHeaders(): array {
-		$headers = [];
-		foreach ($_SERVER as $key => $value)
-			if (substr($key, 0, 5) == 'HTTP_')
-				$headers[self::capitalizeName(strtr(substr($key, 5), '_', '-'))] = $value;
-		$headers['Content-Type'] = $_SERVER['CONTENT_TYPE'] ?? null;
-		$headers['Content-Length'] = $_SERVER['CONTENT_LENGTH'] ?? null;
-
-		return $headers;
-	}
-
+	/**
+	 * Obtains the list of uploaded files
+	 */
 	private static function getGlobalUploadedFiles(): array {
 		$files = [];
 		foreach ($_FILES as $varname => $file)
@@ -302,13 +295,6 @@ class Request implements RequestInterface {
 		}
 		
 		return $files;
-	}
-
-	/**
-	 * Capitalizes a header field name properly
-	 */
-	protected static function capitalizeName(string $name): string {
-		return ucwords(strtolower($name), '-');
 	}
 
 }

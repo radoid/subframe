@@ -95,7 +95,7 @@ class App {
 	 * Specific views can be designated for specific exception codes, by providing an array with codes as keys
 	 * @param string|array $filename The view's filename
 	 */
-	public function catchView(mixed $filename, array $data = []): self {
+	public function catchView($filename, array $data = []): self {
 		$middleware = function (Request $request, Closure $next) use ($filename, $data): ResponseInterface {
 			try {
 				$response = $next($request);
@@ -136,11 +136,14 @@ class App {
 	}
 
 	/**
-	 * Adds another middleware to the middleware stack
+	 * Adds a middleware to the middleware stack
+	 * @param MiddlewareInterface|Closure $middleware
 	 */
-	public function add(MiddlewareInterface $middleware) {
+	public function add($middleware) {
 		$this->middlewareHandler->add($middleware);
-	}
+	
+		return $this;
+}
 
 	/**
 	 * Starts processing of the request taken from the $_SERVER['REQUEST_URI'] variable

@@ -41,11 +41,11 @@ class Router {
 	public function handle(Request $request): ?Response {
 		foreach ($this->routes as [$method, $uri, $action, $classArgs]) {
 			if ($method)
-				$response = $this->captureRoute($request, $method, $uri, $action, $classArgs);
+				$response = $this->tryRoute($request, $method, $uri, $action, $classArgs);
 			elseif ($uri !== null)
-				$response = $this->captureViewRoute($request, $uri, $action, $classArgs);
+				$response = $this->tryViewRoute($request, $uri, $action, $classArgs);
 			else
-				$response = $this->captureRouteInNamespace($request, $action, $classArgs);
+				$response = $this->tryRouteInNamespace($request, $action, $classArgs);
 			if ($response)
 				return $response;
 		}
@@ -58,7 +58,7 @@ class Router {
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 */
-	private function captureRouteInNamespace(Request $request, string $namespace, array $classArgs = []): ?Response {
+	private function tryRouteInNamespace(Request $request, string $namespace, array $classArgs = []): ?Response {
 		if (($route = $this->findRouteInNamespace($request, $namespace))) {
 			[$class, $action, $args] = $route;
 			$instance = new $class($request, ...$classArgs);
@@ -73,12 +73,14 @@ class Router {
 	 * Tries to match a route to the given request, and returns the provided callable's response if matched
 	 * @param string $method The HTTP request method
 	 * @param string $uri The URI for the route, without trailing slash or query parameters
-	 * @param mixed $callable A closure or [Controller, action] combination
+	 * @param callable|string $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @return ?Response
 	 */
-	private function captureRoute(Request $request, string $method, string $uri, $callable, array $classArgs = []): ?Response {
-		if ($method == $request->getMethod() && preg_match("~^$uri$~", $request->getUri(), $matches)) {
+	private function tryRoute(Request $request, string $method, string $uri, $callable, array $classArgs = []): ?Response {
+		$requestUri = '/' . trim(strtok($request->getUri(), '?'), '/');
+		
+		if ($method == $request->getMethod() && preg_match("~^$uri$~", $requestUri, $matches)) {
 			if (is_string($callable) && strpos($callable, '@') !== false)
 				$callable = explode('@', $callable);
 			if (is_array($callable) && is_string($callable[0]))
@@ -95,10 +97,11 @@ class Router {
 	/**
 	 * Tries to match a route to the request, and returns its response if matched
 	 */
-	private function captureViewRoute(Request $request, string $uri, string $filename, array $data = []): ?Response {
-		$uri = trim($uri, '/');
+	private function tryViewRoute(Request $request, string $uri, string $filename, array $data = []): ?Response {
+		$uri = '/' . trim($uri, '/');
+		$requestUri = '/' . trim(strtok($request->getUri(), '?'), '/');
 
-		if ($request->getMethod() == 'GET' && $uri == $request->getUri())
+		if ($request->getMethod() == 'GET' && $uri == $requestUri)
 			$response = Response::fromView($filename, $data);
 		else
 			$response = null;
