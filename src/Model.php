@@ -1,6 +1,9 @@
 <?php
 namespace Subframe;
 
+use Exception;
+use PDO;
+use PDOStatement;
 use stdClass;
 
 /**
@@ -157,7 +160,7 @@ class Model extends stdClass {
 
 	/**
 	 * The database interface
-	 * @var \PDO
+	 * @var PDO
 	 */
 	public static $pdo;
 
@@ -225,7 +228,7 @@ class Model extends stdClass {
 	/**
 	 * Returns the total record count in the table
 	 * @return int
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function count(): int {
 		$sql = "SELECT COUNT(*) FROM ".static::TABLE;
@@ -237,7 +240,7 @@ class Model extends stdClass {
 	 * Tells whether any records exist having given ID(s)
 	 * @param string|string[] $id ID(s) to look for
 	 * @return boolean
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function exists($id): bool {
 		$sql = "SELECT 1 FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).") LIMIT 1";
@@ -248,7 +251,7 @@ class Model extends stdClass {
 	 * Fetches one or more records by their ID(s)
 	 * @param string|string[] $id The ID(s) to look for
 	 * @return static|static[]|null The record
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function get($id) {
 		$sql = "SELECT * FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
@@ -265,7 +268,7 @@ class Model extends stdClass {
 	 * @param string $after_id Optionally, the last ID from the previous request
 	 * @param int $page Optional page number, starting from zero
 	 * @return static[]|null
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function getAll($limit = 0, $after_id = '', $page = 0) {
 		$sql = "SELECT * FROM ".static::TABLE
@@ -277,44 +280,44 @@ class Model extends stdClass {
 
 	/**
 	 * Fetches a record by direct SQL query
-	 * @param string|\PDOStatement $q The query as an SQL string or PDOStatement
+	 * @param string|PDOStatement $q The query as an SQL string or PDOStatement
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return static|null The record
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function fetch($q, array $params = null) {
-		if (!$q instanceof \PDOStatement)
+		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchObject(static::class != 'Subframe/Model' ? static::class : 'stdClass') ?: null;
 	}
 
 	/**
 	 * Fetches records by direct SQL query, optionally indexed by a column
-	 * @param string|\PDOStatement $q The query as an SQL string or PDOStatement
+	 * @param string|PDOStatement $q The query as an SQL string or PDOStatement
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @param string $indexColumn
 	 * @return static[] The records
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function fetchAll($q, array $params = null, $indexColumn = '') {
-		if (!$q instanceof \PDOStatement)
+		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$classname = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
 		if (!$indexColumn)
-			return $q->fetchAll(\PDO::FETCH_CLASS, $classname);
+			return $q->fetchAll(PDO::FETCH_CLASS, $classname);
 		for ($objects = []; ($o = $q->fetchObject($classname)); $objects[$o->$indexColumn] = $o);
 		return $objects;
 	}
 
 	/**
 	 * Fetches a single result (column) by direct SQL query
-	 * @param string|\PDOStatement $q The query
+	 * @param string|PDOStatement $q The query
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string|null
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function result($q, array $params = null) {
-		if (!$q instanceof \PDOStatement)
+		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
 		return $result !== false ? $result : null;
@@ -322,23 +325,23 @@ class Model extends stdClass {
 
 	/**
 	 * Fetches a column by direct SQL query
-	 * @param string|\PDOStatement $q The query
+	 * @param string|PDOStatement $q The query
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return string[]
-	 * @throws \Exception
+	 * @throws Exception
 	 */
 	public static function allResults($q, array $params = null) {
-		if (!$q instanceof \PDOStatement)
+		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
-		return $q->fetchAll(\PDO::FETCH_COLUMN);
+		return $q->fetchAll(PDO::FETCH_COLUMN);
 	}
 
 	/**
 	 * Performs an SQL query, optionally a prepared statement
 	 * @param string $sql The query
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
-	 * @return \PDOStatement
-	 * @throws \Exception
+	 * @return PDOStatement
+	 * @throws Exception
 	 */
 	public static function query(string $sql, array $params = null) {
 		if ($params)
@@ -346,7 +349,7 @@ class Model extends stdClass {
 		else
 			$stmt = self::$pdo->query($sql);
 		if (!$stmt)
-			throw new \Exception(self::$pdo->errorInfo()[2], 500);
+			throw new Exception(self::$pdo->errorInfo()[2], 500);
 		if ($params)
 			$stmt->execute($params);
 		return $stmt;
@@ -373,9 +376,9 @@ class Model extends stdClass {
 	 * @param array $options [optional]
 	 */
 	public static function connect(string $dsn, string $username = '', string $password = '', array $options = []) {
-		self::$pdo = new \PDO($dsn, $username, $password, $options + [
-				\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-				\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
+		self::$pdo = new PDO($dsn, $username, $password, $options + [
+				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+				PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
 		]);
 	}
 

@@ -3,6 +3,7 @@ namespace Subframe;
 
 use Closure;
 use Exception;
+use Throwable;
 
 /**
  * Represents the outermost layer of the application, allowing for middleware and routes definition
@@ -99,7 +100,7 @@ class App {
 		$middleware = function (Request $request, Closure $next) use ($filename, $data): ResponseInterface {
 			try {
 				$response = $next($request);
-			} catch (\Throwable $e) {
+			} catch (Throwable $e) {
 				$code = $e->getCode();
 				$code = (is_numeric($code) && $code >= 400 && $code < 500 ? $code : 500);
 				if ($code == 500)
@@ -125,7 +126,7 @@ class App {
 		$middleware = function (Request $request, Closure $next) use ($closure): ResponseInterface {
 			try {
 				$response = $next($request);
-			} catch (\Throwable $e) {
+			} catch (Throwable $e) {
 				$response = $closure($e);
 			}
 			return $response;
@@ -139,7 +140,7 @@ class App {
 	 * Adds a middleware to the middleware stack
 	 * @param MiddlewareInterface|Closure $middleware
 	 */
-	public function add($middleware) {
+	public function add($middleware): self {
 		$this->middlewareHandler->add($middleware);
 	
 		return $this;
@@ -148,28 +149,28 @@ class App {
 	/**
 	 * Starts processing of the request taken from the $_SERVER['REQUEST_URI'] variable
 	 */
-	public function handleRequestUri() {
+	public function handleRequestUri(): void {
 		$this->handle(Request::fromGlobalRequestUri());
 	}
 
 	/**
 	 * Starts processing of the request taken from the $_SERVER['REQUEST_URI'] variable, but relative to the index.php script
 	 */
-	public function handleRelativeRequestUri() {
+	public function handleRelativeRequestUri(): void {
 		$this->handle(Request::fromGlobalRelativeUri());
 	}
 
 	/**
 	 * Starts processing of the request taken from the $_SERVER['PATH_INFO'] variable
 	 */
-	public function handlePathInfo() {
+	public function handlePathInfo(): void {
 		$this->handle(Request::fromGlobalPathInfo());
 	}
 
 	/**
 	 * Starts processing of the given request
 	 */
-	public function handle(RequestInterface $request) {
+	public function handle(RequestInterface $request): void {
 		$response = $this->middlewareHandler->handle($request);
 		$response->send();
 	}

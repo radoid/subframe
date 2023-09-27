@@ -18,9 +18,6 @@ class Image {
 	/** @var array|null */
 	private $exif;
 
-	/** @var bool */
-	private $dirty = false;
-
 
 	/**
 	 * The constructor
@@ -106,6 +103,7 @@ class Image {
 	 * Rotates the image
 	 * @param float $angle
 	 * @return Image
+	 * @throws Exception
 	 */
 	public function rotate(float $angle): self {
 		$this->image = imagerotate($this->image, $angle, 0);

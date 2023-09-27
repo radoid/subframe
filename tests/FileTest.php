@@ -1,8 +1,9 @@
 <?php
 
+use PHPUnit\Framework\TestCase;
 use Subframe\File;
 
-class FileTest extends \PHPUnit\Framework\TestCase {
+class FileTest extends TestCase {
 
 	private const ROOT = __DIR__.'/files';
 

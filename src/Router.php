@@ -1,6 +1,9 @@
 <?php
 namespace Subframe;
 
+use ReflectionClass;
+use Throwable;
+
 /**
  * Implements the application routing
  * @package Subframe PHP Framework
@@ -17,22 +20,28 @@ class Router {
 	/**
 	 * Adds a route defined with 3 components
 	 */
-	public function addRoute(string $method, string $uri, $action, array $classArgs = []): void {
+	public function addRoute(string $method, string $uri, $action, array $classArgs = []): self {
 		$this->routes[] = [$method, $uri, $action, $classArgs];
+
+		return $this;
 	}
 
 	/**
 	 * Adds a view route, only presenting the given view
 	 */
-	public function addView(string $uri, string $filename, array $data = []): void {
+	public function addView(string $uri, string $filename, array $data = []): self {
 		$this->routes[] = [null, $uri, $filename, $data];
+
+		return $this;
 	}
 
 	/**
 	 * Adds a namespace with its classes as routes
 	 */
-	public function addNamespace(string $namespace, array $classArgs = []): void {
+	public function addNamespace(string $namespace, array $classArgs = []): self {
 		$this->routes[] = [null, null, $namespace, $classArgs];
+
+		return $this;
 	}
 
 	/**
@@ -71,6 +80,7 @@ class Router {
 
 	/**
 	 * Tries to match a route to the given request, and returns the provided callable's response if matched
+	 * @param Request $request
 	 * @param string $method The HTTP request method
 	 * @param string $uri The URI for the route, without trailing slash or query parameters
 	 * @param callable|string $callable A closure or [Controller, action] combination
@@ -191,12 +201,12 @@ class Router {
 
 		if (isset($route))
 			try {
-				$r = new \ReflectionClass($classname);
+				$r = new ReflectionClass($classname);
 				$m = $r->getMethod($route[1]);
 				if ($m->isPublic() && $m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
 					return $route;
 			}
-			catch (\Throwable $ignored) {}
+			catch (Throwable $ignored) {}
 
 		return null;
 	}
