@@ -19,13 +19,14 @@ class Cache {
 	 */
 	protected $ttl;
 
+
 	/**
 	 * The constructor
 	 * @param string $directory Storage directory
 	 * @param int $ttl Default duration in seconds
 	 */
 	public function __construct(string $directory, int $ttl = 86400) {
-		$this->directory = rtrim($directory, "/") . "/";
+		$this->directory = rtrim($directory, '/') . '/';
 		$this->ttl = $ttl;
 	}
 
@@ -35,13 +36,10 @@ class Cache {
 	 * @param int|null $lastModified Optional timestamp of the last modification (to also check whether the content is new, not just valid)
 	 * @return bool
 	 */
-	public function has(string $name, ?int $lastModified = null): bool {
-		if (@filemtime($this->directory.$name) > time())
-			if ($lastModified)
-				return ($lastModified >= @filectime($this->directory.$name));
-			else
-				return true;
-		return false;
+	public function has(string $name): bool {
+		$mtime = @filemtime($this->directory.$name);
+		
+		return ($mtime > time());
 	}
 
 	/**
@@ -116,7 +114,7 @@ class Cache {
 	 * Stores the value of any type, var_export-ed
 	 * @param string $name
 	 * @param mixed $data
-	 * @param int $ttl Optional duration in seconds, or default duration will be used
+	 * @param ?int $ttl Optional duration in seconds, or default duration will be used
 	 * @return bool true on success or false on failure
 	 */
 	public function export(string $name, $data, ?int $ttl = null): bool {
@@ -139,7 +137,7 @@ class Cache {
 	 * Stores the value of any type, serialized
 	 * @param string $name
 	 * @param mixed $data
-	 * @param int $ttl Optional duration in seconds, or default duration will be used
+	 * @param ?int $ttl Optional duration in seconds, or default duration will be used
 	 * @return bool true on success or false on failure
 	 */
 	public function serialize(string $name, $data, ?int $ttl = null): bool {

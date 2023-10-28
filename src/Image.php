@@ -25,10 +25,11 @@ class Image {
 	/**
 	 * The constructor
 	 * @param string $source Image file path
+	 * @throws Exception
 	 */
 	public function __construct(string $source) {
 		if (!extension_loaded('gd'))
-			throw new Exception("GD PHP extension is required.", 500);
+			throw new Exception('GD PHP extension is required.', 500);
 		if (!is_readable($source))
 			throw new Exception("File $source not found.", 500);
 
@@ -78,7 +79,7 @@ class Image {
 		return $this->exif[$key] ?? null;
 	}
 
-	public function isModified() {
+	public function isModified(): bool {
 		return $this->isModified;
 	}
 
@@ -90,6 +91,8 @@ class Image {
 	 * @param int|null $srcY
 	 * @param int|null $srcWidth
 	 * @param int|null $srcHeight
+	 * @return Image
+	 * @throws Exception
 	 */
 	public function resample(int $destWidth, int $destHeight, ?int $srcX = null, ?int $srcY = null, ?int $srcWidth = null, ?int $srcHeight = null): self {
 		$dest = imagecreatetruecolor($destWidth, $destHeight);
@@ -106,6 +109,7 @@ class Image {
 	/**
 	 * Rotates the image
 	 * @param float $angle Rotation angle in degrees, anti-clockwise
+	 * @throws Exception
 	 */
 	public function rotate(float $angle): self {
 		$this->image = imagerotate($this->image, $angle, 0);
@@ -121,6 +125,8 @@ class Image {
 	 * @param int $maxWidth
 	 * @param int $maxHeight
 	 * @param bool $canEnlarge
+	 * @return Image
+	 * @throws Exception
 	 */
 	function contain(int $maxWidth, int $maxHeight, bool $canEnlarge = false): self {
 		$width  = imagesx($this->image);
@@ -142,6 +148,8 @@ class Image {
 	 * @param int $maxWidth
 	 * @param int $maxHeight
 	 * @param bool $canEnlarge
+	 * @return Image
+	 * @throws Exception
 	 */
 	function cover(int $maxWidth, int $maxHeight, bool $canEnlarge = true): self {
 		$width  = imagesx($this->image);
@@ -164,6 +172,7 @@ class Image {
 	 * @param string|null $destination The path to save the file to
 	 * @param int $destinationType PHP image type constant
 	 * @param int $quality quality value from 0 (worst) to 100 (best)
+	 * @throws Exception
 	 */
 	function save(string $destination, int $destinationType = IMAGETYPE_JPEG, int $quality = 98): self {
 		if ($destinationType == IMAGETYPE_GIF)

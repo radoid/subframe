@@ -1,6 +1,8 @@
 <?php
 namespace Subframe;
 
+use Exception;
+
 /**
  * Base MVC controller implementation
  * @package Subframe PHP Framework
@@ -10,50 +12,37 @@ class Controller {
 	/**
 	 * Outputs a view/template provided with given data
 	 * @param string $__filename The filename of the view, without ".php" extension
-	 * @param array|object $__data The data
+	 * @param array $__data The data
 	 * @param int $__status The optional HTTP status code
-	 * @throws \Exception
+	 * @throws Exception
 	 */
-	protected function view(string $__filename, $__data = [], int $__status = 200) {
+	protected function view(string $__filename, array $__data = [], int $__status = 200): void {
 		http_response_code($__status);
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE & ~E_WARNING);
-		extract((array) $__data);
+		extract($__data);
 		require "$__filename.php";
 		error_reporting($error_reporting);
 	}
 
 	/**
-	 * Processes a view/template, provided with data, and returns its output
-	 * @param string $filename The filename of the view, without ".php" extension
-	 * @param array $data The data
-	 * @return string The output
-	 * @throws \Exception
-	 */
-	protected function obView(string $filename, array $data = []): string {
-		ob_start();
-		$this->view($filename, $data);
-		return ob_get_clean();
-	}
-
-	/**
 	 * Outputs JSON encoded object or array
-	 * @param object|array $data The data to output
+	 * @param array $data The data to output
 	 * @param int $status Optional HTTP status code
 	 */
-	protected function json($data = [], int $status = 200) {
+	protected function json(array $data = [], int $status = 200): void {
 		http_response_code($status);
-		header("Content-Type: application/json");
+		header('Content-Type: application/json');
 		die(json_encode($data));
 	}
 
 	/**
-	 * Throws an exception; for convenience, as it can be part of an expression
+	 * Throws an exception
 	 * @param string $message The message of the exception
 	 * @param int $code The code of the exception
-	 * @throws \Exception
+	 * @throws Exception
 	 */
-	protected function throw(string $message, int $code = 500) {
-		throw new \Exception($message, $code);
+	protected function throw(string $message, int $code = 500): void {
+		throw new Exception($message, $code);
 	}
 
 	/**
@@ -61,9 +50,9 @@ class Controller {
 	 * @param string $url The URL to go to
 	 * @param int $code HTTP status code, such as 301; defaults to 302
 	 */
-	protected function redirect(string $url, int $code = 302) {
+	protected function redirect(string $url, int $code = 302): void {
 		http_response_code($code);
-		header("Location: " . str_replace("\n", "\0", $url));
+		header('Location: ' . str_replace("\n", "\0", $url));
 		exit;
 	}
 

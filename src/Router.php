@@ -164,7 +164,7 @@ class Router {
 		$argc = count($argv);
 
 		$classv = [$namespace];
-		for ($i = 0; $i < $argc; $classv[] = $this->classCase($argv[$i++]));
+		for ($i = 0; $i < $argc; $classv[] = $this->classCase($argv[$i++])) {}
 		for ($i = $argc; $i >= 0; $i--) {
 			$class = join('\\', array_slice($classv, 0, 1+$i));
 			if (class_exists($found = $class.'\\Home'))
@@ -217,7 +217,7 @@ class Router {
 			try {
 				$r = new ReflectionClass($classname);
 				$m = $r->getMethod($route[1]);
-				if ($m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
+				if ($m->isPublic() && $m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
 					return $route;
 			}
 			catch (Throwable $ignored) {}

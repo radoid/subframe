@@ -1,6 +1,7 @@
 <?php
 namespace Subframe;
 
+use Exception;
 use PDO;
 use PDOStatement;
 use stdClass;
@@ -76,7 +77,7 @@ class Model extends stdClass {
 	 * The fields present in the object, as a string suitable for use in SQL queries
 	 * @return string
 	 */
-	public function keys() {
+	public function keys(): string {
 		$keys = "";
 		foreach ($this as $key => $value)
 			if (isset($this->$key))
@@ -88,7 +89,7 @@ class Model extends stdClass {
 	 * The values present in the object, quoted, as a string suitable for use in SQL queries
 	 * @return string
 	 */
-	public function values() {
+	public function values(): string {
 		$values = "";
 		foreach ($this as $key => $value)
 			if (isset($this->$key))
@@ -292,7 +293,7 @@ class Model extends stdClass {
 	 * Fetches records by direct SQL query, optionally indexed by a column
 	 * @param string|PDOStatement $q The query as an SQL string or PDOStatement
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
-	 * @param string $indexColumn
+	 * @param string|null $indexColumn
 	 * @return static[] The records
 	 * @throws Exception
 	 */
@@ -313,7 +314,7 @@ class Model extends stdClass {
 	 * @return string|null
 	 * @throws Exception
 	 */
-	public static function result($q, array $params = null) {
+	public static function result($q, array $params = null): ?string {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
@@ -327,7 +328,7 @@ class Model extends stdClass {
 	 * @return string[]
 	 * @throws Exception
 	 */
-	public static function allResults($q, array $params = null) {
+	public static function allResults($q, array $params = null): array {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchAll(PDO::FETCH_COLUMN);
@@ -340,7 +341,7 @@ class Model extends stdClass {
 	 * @return PDOStatement
 	 * @throws Exception
 	 */
-	public static function query(string $sql, array $params = null) {
+	public static function query(string $sql, array $params = null): PDOStatement {
 		if ($params)
 			$stmt = self::$pdo->prepare($sql);
 		else
@@ -356,7 +357,7 @@ class Model extends stdClass {
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
 	 * @return int The number of rows affected
 	 */
-	public static function exec(string $sql, array $params = null) {
+	public static function exec(string $sql, array $params = null): int {
 		if ($params) {
 			$stmt = self::$pdo->prepare($sql);
 			$stmt->execute($params);

@@ -14,7 +14,7 @@ class File {
 	 * @param int $mkdirMode Optional permissions for the directories, should they be created (if non-zero)
 	 * @return string
 	 */
-	static public function unique(string $filepath, int $mkdirMode = 0777): string {
+	public static function unique(string $filepath, int $mkdirMode = 0777): string {
 		$parts = pathinfo($filepath);
 		$dir = $parts['dirname'];
 		$base = $parts['filename'];
@@ -35,7 +35,7 @@ class File {
 	 * @param int $mkdirMode Optional permissions for the directories, should they be created (if non-zero)
 	 * @return string
 	 */
-	static public function uniqueUri(string $root, string $uri, int $mkdirMode = 0777): string {
+	public static function uniqueUri(string $root, string $uri, int $mkdirMode = 0777): string {
 		$root = rtrim($root, '/');
 		$parts = pathinfo($uri);
 		$base = "$parts[dirname]/$parts[filename]";
@@ -54,7 +54,7 @@ class File {
 	 * @param string $name The file name (without directories)
 	 * @return string
 	 */
-	static public function safe(string $name): string {
+	public static function safe(string $name): string {
 		$name = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($name)), '-');
 		$name = strlen($name) ? $name : '1';
 
@@ -63,12 +63,11 @@ class File {
 
 	/**
 	 * Write the contents of a file, replacing it atomically if it already exists.
-	 *
 	 * @param string $path
 	 * @param string $content
 	 * @return void
 	 */
-	public function replace(string $path, string $content) {
+	public function replace(string $path, string $content): void {
 		// If the path already exists and is a symlink, get the real path...
 		clearstatcache(true, $path);
 

@@ -16,9 +16,8 @@ class HTTP {
 	 * @param array $files Optional files (filenames) to upload
 	 * @param array $options Optional PHP stream context options
 	 * @return array|bool An array with 'status', 'header' and 'content' keys, corresponding to the response, or false on error
-	 * @throws \Exception
 	 */
-	static public function request(string $method, string $url, array $header = [], $data = [], array $files = [], array $options = []) {
+	public static function request(string $method, string $url, array $header = [], $data = [], array $files = [], array $options = []) {
 		$body = (is_array($data) ? http_build_query($data) : $data);
 		if ($method == 'POST')
 			if ($files) {
@@ -60,9 +59,8 @@ class HTTP {
 	 * @param array $files
 	 * @param string $delimiter
 	 * @return string
-	 * @throws \Exception
 	 */
-	static public function buildMultipartQuery(array $data, array $files = [], string $delimiter) {
+	public static function buildMultipartQuery(array $data, array $files = [], string $delimiter): string {
 		$body = '';
 
 		foreach ($data as $name => $value)
