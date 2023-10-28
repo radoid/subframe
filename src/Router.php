@@ -1,6 +1,9 @@
 <?php
 namespace Subframe;
 
+use ReflectionClass;
+use Throwable;
+
 /**
  * Implements the application routing
  * @package Subframe PHP Framework
@@ -13,57 +16,47 @@ class Router {
 	/** @var string */
 	private $uri;
 
-	/** @var Cache|null */
-	private $cache;
-
 
 	/**
 	 * Creates a router for the given request parameters or for the current request
 	 * @param string $method HTTP method/verb
 	 * @param string $uri requested URI
-	 * @param Cache|null $cache
 	 */
-	public function __construct(string $method, string $uri, ?Cache $cache = null) {
+	public function __construct(string $method, string $uri) {
 		$this->method = $method;
 		$this->uri = trim(strtok($uri, '?'), '/');
-		$this->cache = $cache;
 	}
 
 	/**
 	 * Creates a router for the request from the REQUEST_URI constant
-	 * @param Cache|null $cache
-	 * @return Router
 	 */
-	public static function fromRequestUri(?Cache $cache = null): Router {
+	public static function fromRequestUri(): self {
 		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$requestUri = Request::getUri();
+		$requestUri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
 
-		return new Router($method, $requestUri, $cache);
+		return new Router($method, $requestUri);
 	}
 
 	/**
 	 * Creates a router for the request from the PATH_INFO constant
-	 * @param Cache|null $cache
-	 * @return Router
 	 */
-	public static function fromPathInfo(?Cache $cache = null): Router {
+	public static function fromPathInfo(): self {
 		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$pathInfo = Request::getPathInfo();
+		$pathInfo = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
 
-		return new Router($method, $pathInfo, $cache);
+		return new Router($method, $pathInfo);
 	}
 
 	/**
 	 * Tries to dispatch the request within a namespace
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return Router
 	 */
 	public function routeInNamespace(string $namespace, array $classArgs = []): self {
 		if (($route = $this->findRouteInNamespace($namespace))) {
 			[$class, $action, $args] = $route;
 			$instance = new $class(...$classArgs);
-			self::handleRoute([$instance, $action], $args, $this->cache);
+			$this->handleRoute([$instance, $action], $args);
 		}
 		return $this;
 	}
@@ -74,7 +67,6 @@ class Router {
 	 * @param string $uri The URI for the route
 	 * @param mixed $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return Router
 	 */
 	public function route(string $method, string $uri, $callable, array $classArgs = []): self {
 		$uri = trim($uri, '/');
@@ -85,7 +77,7 @@ class Router {
 			if (is_array($callable) && is_string($callable[0]))
 				$callable[0] = new $callable[0](...$classArgs);
 			$args = array_slice($matches, 1);
-			self::handleRoute($callable, $args, $cache ?? $this->cache);
+			$this->handleRoute($callable, $args);
 		}
 
 		return $this;
@@ -96,7 +88,6 @@ class Router {
 	 * @param string $uri The URI for the route
 	 * @param mixed $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return Router
 	 */
 	public function get(string $uri, $callable, array $classArgs = []): self {
 		return $this->route('GET', $uri, $callable, $classArgs);
@@ -173,15 +164,15 @@ class Router {
 		$argc = count($argv);
 
 		$classv = [$namespace];
-		for ($i = 0; $i < $argc; $classv[] = self::classCase($argv[$i++]));
+		for ($i = 0; $i < $argc; $classv[] = $this->classCase($argv[$i++]));
 		for ($i = $argc; $i >= 0; $i--) {
 			$class = join('\\', array_slice($classv, 0, 1+$i));
 			if (class_exists($found = $class.'\\Home'))
-				if (($route = self::findRouteInClass($found, $this->method, array_slice($argv, $i))))
+				if (($route = $this->findRouteInClass($found, $this->method, array_slice($argv, $i))))
 					return $route;
 			if ($i > 0)
 				if (class_exists($found = $class))
-					if (($route = self::findRouteInClass($found, $this->method, array_slice($argv, $i))))
+					if (($route = $this->findRouteInClass($found, $this->method, array_slice($argv, $i))))
 						return $route;
 		}
 
@@ -195,7 +186,7 @@ class Router {
 	 * @param string[] $args The request's arguments
 	 * @return string[]|null The action (function) name
 	 */
-	public static function findRouteInClass(string $classname, string $method, array $args): ?array {
+	public function findRouteInClass(string $classname, string $method, array $args): ?array {
 		$method = strtolower($method);
 		$count = count($args);
 
@@ -207,14 +198,14 @@ class Router {
 
 		// action or methodAction
 		else if ($count > 0
-			&& (method_exists($classname, $fn = self::actionCase($method, $args[0]))
-					|| method_exists($classname, $fn = self::actionCase('', $args[0]))))
+			&& (method_exists($classname, $fn = $this->actionCase($method, $args[0]))
+					|| method_exists($classname, $fn = $this->actionCase('', $args[0]))))
 			$route = [$classname, $fn, array_slice($args, 1)];
 
 		// resource+action or resource+methodAction
 		else if ($count >= 2
-				&& (method_exists($classname, $fn = self::actionCase($method, $args[1]))
-						|| method_exists($classname, $fn = self::actionCase('', $args[1])))) {
+				&& (method_exists($classname, $fn = $this->actionCase($method, $args[1]))
+						|| method_exists($classname, $fn = $this->actionCase('', $args[1])))) {
 			array_splice($args, 1, 1);
 			$route = [$classname, $fn, $args];
 
@@ -224,12 +215,12 @@ class Router {
 
 		if (isset($route))
 			try {
-				$r = new \ReflectionClass($classname);
+				$r = new ReflectionClass($classname);
 				$m = $r->getMethod($route[1]);
 				if ($m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
 					return $route;
 			}
-			catch (\Throwable $ignored) {}
+			catch (Throwable $ignored) {}
 
 		return null;
 	}
@@ -238,37 +229,8 @@ class Router {
 	 * Dispatches the request to a callable
 	 * @param callable $callable
 	 * @param array $args
-	 * @param Cache|null $cache
 	 */
-	private static function handleRoute(callable $callable, array $args, Cache $cache = null) {
-		$gzip = (strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', "gzip") !== false && extension_loaded('zlib') ? ".gz" : '');
-
-		$cachename = ($cache && @$_SERVER['REQUEST_METHOD'] == "GET" ? "output".str_replace("/", "-", $_SERVER['REQUEST_URI']).".html$gzip" : false);
-		if ($cachename) {
-			self::setETag(md5($cachename.$cache->getTime($cachename)));
-
-			if (!empty ($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
-				if ($cache->has($cachename, strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']))) {
-					header_remove();
-					http_response_code(304); // 304 Not Modified
-					exit;
-				}
-			}
-			header("Last-Modified: ".date("r"));
-			header("Vary: Accept-Encoding");
-			if ($cache->has($cachename)) {
-				if ($gzip) {
-					ini_set('zlib.output_compression', 'Off');
-					header('Content-Encoding: gzip');
-				}
-				$cache->dump($cachename);
-				exit;
-			}
-		}
-
-		if ($cachename)
-			ob_start();
-
+	private function handleRoute(callable $callable, array $args): void {
 		$result = call_user_func_array($callable, $args);
 
 		if (is_string($result))
@@ -277,9 +239,6 @@ class Router {
 			header('Content-Type: application/json; charset=utf-8');
 			echo json_encode($result);
 		}
-
-		if ($cachename)
-			$cache->put($cachename, $gzip ? gzencode(ob_get_contents()) : ob_get_contents());
 
 		if ($result !== false)
 			exit;
@@ -290,7 +249,7 @@ class Router {
 	 * @param string $arg The argument
 	 * @return string The result
 	 */
-	private static function classCase(string $arg): string {
+	private function classCase(string $arg): string {
 		if (strpbrk($arg, '-.'))
 			return strtr(ucwords($arg, '-.'), ['-' => '', '.' => '']);
 		return ucfirst($arg);
@@ -302,23 +261,10 @@ class Router {
 	 * @param string $arg The argument
 	 * @return string The result
 	 */
-	private static function actionCase(string $method, string $arg): string {
+	private function actionCase(string $method, string $arg): string {
 		if (strpbrk($arg, '-.'))
 			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
 		return ($method ? $method.ucfirst($arg) : $arg);
-	}
-
-	/**
-	 * Sets the ETag header and triggers 304 response if ETags match
-	 * @param string $etag The ETag value
-	 */
-	protected static function setETag(string $etag) {
-		if (($before = $_SERVER['HTTP_IF_NONE_MATCH'] ?? ''))
-			if ($before == $etag) {
-				http_response_code(304); // 304 Not Modified
-				exit;
-			}
-		header("ETag: $etag");
 	}
 
 }
