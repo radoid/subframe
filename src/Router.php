@@ -10,169 +10,128 @@ use Throwable;
  */
 class Router {
 
-	/** @var string */
-	private $method;
-
-	/** @var string */
-	private $uri;
+	/**
+	 * All defined routes
+	 * @var array[]
+	 */
+	private array $routes = [];
 
 
 	/**
-	 * Creates a router for the given request parameters or for the current request
-	 * @param string $method HTTP method/verb
-	 * @param string $uri requested URI
+	 * Adds a route defined with 3 components
 	 */
-	public function __construct(string $method, string $uri) {
-		$this->method = $method;
-		$this->uri = trim(strtok($uri, '?'), '/');
-	}
+	public function addRoute(string $method, string $uri, $action, array $classArgs = []): self {
+		$this->routes[] = [$method, $uri, $action, $classArgs];
 
-	/**
-	 * Creates a router for the request from the REQUEST_URI constant
-	 */
-	public static function fromRequestUri(): self {
-		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$requestUri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
-
-		return new Router($method, $requestUri);
-	}
-
-	/**
-	 * Creates a router for the request from the PATH_INFO constant
-	 */
-	public static function fromPathInfo(): self {
-		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-		$pathInfo = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
-
-		return new Router($method, $pathInfo);
-	}
-
-	/**
-	 * Tries to dispatch the request within a namespace
-	 * @param string $namespace The namespace; the root namespace if empty
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 */
-	public function routeInNamespace(string $namespace, array $classArgs = []): self {
-		if (($route = $this->findRouteInNamespace($namespace))) {
-			[$class, $action, $args] = $route;
-			$instance = new $class(...$classArgs);
-			$this->handleRoute([$instance, $action], $args);
-		}
 		return $this;
 	}
 
 	/**
-	 * Defines a route: checks if the request is compatible with the given URI, and routes the request to the given callable if it is
-	 * @param string $method The HTTP request method
-	 * @param string $uri The URI for the route
-	 * @param mixed $callable A closure or [Controller, action] combination
-	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * Adds a namespace with its classes as routes
 	 */
-	public function route(string $method, string $uri, $callable, array $classArgs = []): self {
-		$uri = trim($uri, '/');
+	public function addNamespace(string $namespace, array $classArgs = []): self {
+		$this->routes[] = [null, null, $namespace, $classArgs];
 
-		if ($method == $this->method && preg_match("~^$uri$~", $this->uri, $matches)) {
+		return $this;
+	}
+
+	/**
+	 * Tries to dispatch the request represented by the global REQUEST_METHOD and REQUEST_URI constants
+	 */
+	public function handleRequestUri(): bool {
+		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+		$uri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
+
+		return $this->handle($method, $uri);
+	}
+
+	/**
+	 * Tries to dispatch the request represented by the global REQUEST_METHOD and PATH_INFO constants
+	 */
+	public function handlePathInfo(): bool {
+		$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+		$uri = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
+
+		return $this->handle($method, $uri);
+	}
+
+	/**
+	 * Tries to dispatch the given request among defined routes: executes one and exits if found
+	 */
+	public function handle(string $requestMethod, string $requestUri): bool {
+		foreach ($this->routes as [$method, $uri, $action, $classArgs]) {
+			if ($method)
+				$route = $this->tryRoute($requestMethod, $requestUri, $method, $uri, $action, $classArgs);
+			else
+				$route = $this->tryNamespace($requestMethod, $requestUri, $action, $classArgs);
+			if ($route) {
+				[$callable, $args] = $route;
+				$result = call_user_func_array($callable, $args);
+				if ($result !== false)
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Tries to match a route to the given request, and returns the provided callable's response if matched
+	 * @param Request $request
+	 * @param string $method The HTTP request method
+	 * @param string $uri The URI for the route, without trailing slash or query parameters
+	 * @param callable|string $callable A closure or [Controller, action] combination
+	 * @param array $classArgs Optional arguments to the found class' constructor
+	 * @return ?array
+	 */
+	private function tryRoute(string $requestMethod, string $requestUri, string $method, string $uri, $callable, array $classArgs = []): ?array {
+		$requestUri = '/' . trim(strtok($requestUri, '?'), '/');
+		
+		if ($method == $requestMethod && preg_match("~^$uri$~", $requestUri, $matches)) {
 			if (is_string($callable) && strpos($callable, '@') !== false)
 				$callable = explode('@', $callable);
 			if (is_array($callable) && is_string($callable[0]))
 				$callable[0] = new $callable[0](...$classArgs);
 			$args = array_slice($matches, 1);
-			$this->handleRoute($callable, $args);
-		}
 
-		return $this;
+			return [$callable, $args];
+		} else
+			return null;
 	}
 
 	/**
-	 * Defines a GET route, using route() method
-	 * @param string $uri The URI for the route
-	 * @param mixed $callable A closure or [Controller, action] combination
+	 * Tries to dispatch the given request within a namespace, returns route's Response if found
+	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 */
-	public function get(string $uri, $callable, array $classArgs = []): self {
-		return $this->route('GET', $uri, $callable, $classArgs);
-	}
-
-	/**
-	 * Defines a POST route, using route() method
-	 * @param string $uri The URI for the route
-	 * @param mixed $callable A closure or [Controller, action] combination
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return Router
-	 */
-	public function post(string $uri, $callable, array $classArgs = []): self {
-		return $this->route('POST', $uri, $callable, $classArgs);
-	}
-
-	/**
-	 * Defines a PUT route, using route() method
-	 * @param string $uri The URI for the route
-	 * @param mixed $callable A closure or [Controller, action] combination
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return Router
-	 */
-	public function put(string $uri, $callable, array $classArgs = []): self {
-		return $this->route('PUT', $uri, $callable, $classArgs);
-	}
-
-	/**
-	 * Defines a DELETE route, using route() method
-	 * @param string $uri The URI for the route
-	 * @param mixed $callable A closure or [Controller, action] combination
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return Router
-	 */
-	public function delete(string $uri, $callable, array $classArgs = []): self {
-		return $this->route('DELETE', $uri, $callable, $classArgs);
-	}
-
-	/**
-	 * Defines a OPTIONS route, using route() method
-	 * @param string $uri The URI for the route
-	 * @param mixed $callable A closure or [Controller, action] combination
-	 * @param array $classArgs Optional arguments to the found class' constructor
-	 * @return Router
-	 */
-	public function options(string $uri, $callable, array $classArgs = []): self {
-		return $this->route('OPTIONS', $uri, $callable, $classArgs);
-	}
-
-	/**
-	 * Defines a GET route, using route() method, that only outputs a template/view
-	 * @param string $uri The URI for the route
-	 * @param string $filename Template name
-	 * @param array $data Optional data for the template
-	 * @return Router
-	 */
-	public function view(string $uri, string $filename, array $data = []): self {
-		return $this->route('GET', $uri, function () use ($filename, $data) {
-			new class ($filename, $data) extends Controller {
-				function __construct($filename, $data) {
-					$this->view($filename, $data);
-				}
-			};
-		});
+	private function tryNamespace(string $requestMethod, string $requestUri, string $namespace, array $classArgs = []): ?array {
+		if (($route = $this->findRouteInNamespace($requestMethod, $requestUri, $namespace))) {
+			[$class, $action, $args] = $route;
+			$instance = new $class(...$classArgs);
+			return [[$instance, $action], $args];
+		} else
+			return null;
 	}
 
 	/**
 	 * Tries to find a route within a namespace
-	 * @param string $namespace
-	 * @return array|null
 	 */
-	public function findRouteInNamespace(string $namespace): ?array {
-		$argv = ($this->uri !== '' ? explode('/', $this->uri) : []);
+	public function findRouteInNamespace(string $requestMethod, string $requestUri, string $namespace): ?array {
+		$method = $requestMethod;
+		$uri = trim($requestUri, '/');
+		$argv = ($uri !== '' ? explode('/', $uri) : []);
 		$argc = count($argv);
 
 		$classv = [$namespace];
-		for ($i = 0; $i < $argc; $classv[] = $this->classCase($argv[$i++])) {}
+		for ($i = 0; $i < $argc; $classv[] = $this->classCase($argv[$i++]));
 		for ($i = $argc; $i >= 0; $i--) {
 			$class = join('\\', array_slice($classv, 0, 1+$i));
 			if (class_exists($found = $class.'\\Home'))
-				if (($route = $this->findRouteInClass($found, $this->method, array_slice($argv, $i))))
+				if (($route = $this->findRouteInClass($found, $method, array_slice($argv, $i))))
 					return $route;
 			if ($i > 0)
 				if (class_exists($found = $class))
-					if (($route = $this->findRouteInClass($found, $this->method, array_slice($argv, $i))))
+					if (($route = $this->findRouteInClass($found, $method, array_slice($argv, $i))))
 						return $route;
 		}
 
@@ -223,25 +182,6 @@ class Router {
 			catch (Throwable $ignored) {}
 
 		return null;
-	}
-
-	/**
-	 * Dispatches the request to a callable
-	 * @param callable $callable
-	 * @param array $args
-	 */
-	private function handleRoute(callable $callable, array $args): void {
-		$result = call_user_func_array($callable, $args);
-
-		if (is_string($result))
-			echo $result;
-		elseif (is_array($result) || is_object($result)) {
-			header('Content-Type: application/json; charset=utf-8');
-			echo json_encode($result);
-		}
-
-		if ($result !== false)
-			exit;
 	}
 
 	/**
