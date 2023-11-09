@@ -54,7 +54,7 @@ class Router {
 			elseif ($uri !== null)
 				$response = $this->tryViewRoute($request, $uri, $action, $classArgs);
 			else
-				$response = $this->tryRouteInNamespace($request, $action, $classArgs);
+				$response = $this->tryNamespace($request, $action, $classArgs);
 			if ($response)
 				return $response;
 		}
@@ -67,11 +67,11 @@ class Router {
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 */
-	private function tryRouteInNamespace(Request $request, string $namespace, array $classArgs = []): ?Response {
+	private function tryNamespace(Request $request, string $namespace, array $classArgs = []): ?Response {
 		if (($route = $this->findRouteInNamespace($request, $namespace))) {
 			[$class, $action, $args] = $route;
 			$instance = new $class($request, ...$classArgs);
-			$response = self::captureCallable([$instance, $action], $args);
+			$response = $this->captureResponse([$instance, $action], $args);
 		} else
 			$response = null;
 
@@ -97,7 +97,7 @@ class Router {
 				$callable[0] = new $callable[0]($request, ...$classArgs);
 			$args = array_slice($matches, 1);
 
-			$response = self::captureCallable($callable, $args);
+			$response = $this->captureResponse($callable, $args);
 		} else
 			$response = null;
 
@@ -122,7 +122,7 @@ class Router {
 	/**
 	 * Executes given callable and returns a Response made from its output
 	 */
-	private static function captureCallable(callable $callable, array $args): ?Response {
+	private function captureResponse(callable $callable, array $args): ?Response {
 		$result = call_user_func_array($callable, $args);
 		$status = http_response_code();
 
@@ -150,15 +150,15 @@ class Router {
 		$argc = count($argv);
 
 		$classv = [$namespace];
-		for ($i = 0; $i < $argc; $classv[] = self::classCase($argv[$i++]));
+		for ($i = 0; $i < $argc; $classv[] = $this->classCase($argv[$i++]));
 		for ($i = $argc; $i >= 0; $i--) {
 			$class = join('\\', array_slice($classv, 0, 1+$i));
 			if (class_exists($found = $class.'\\Home'))
-				if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
+				if (($route = $this->findRouteInClass($found, $method, array_slice($argv, $i))))
 					return $route;
 			if ($i > 0)
 				if (class_exists($found = $class))
-					if (($route = self::findRouteInClass($found, $method, array_slice($argv, $i))))
+					if (($route = $this->findRouteInClass($found, $method, array_slice($argv, $i))))
 						return $route;
 		}
 
@@ -172,7 +172,7 @@ class Router {
 	 * @param string[] $args The request's arguments
 	 * @return string[]|null The action (function) name
 	 */
-	public static function findRouteInClass(string $classname, string $method, array $args): ?array {
+	public function findRouteInClass(string $classname, string $method, array $args): ?array {
 		$method = strtolower($method);
 		$count = count($args);
 
@@ -184,14 +184,14 @@ class Router {
 
 		// action or methodAction
 		else if ($count > 0
-			&& (method_exists($classname, $fn = self::actionCase($method, $args[0]))
-					|| method_exists($classname, $fn = self::actionCase('', $args[0]))))
+			&& (method_exists($classname, $fn = $this->actionCase($method, $args[0]))
+					|| method_exists($classname, $fn = $this->actionCase('', $args[0]))))
 			$route = [$classname, $fn, array_slice($args, 1)];
 
 		// resource+action or resource+methodAction
 		else if ($count >= 2
-				&& (method_exists($classname, $fn = self::actionCase($method, $args[1]))
-						|| method_exists($classname, $fn = self::actionCase('', $args[1])))) {
+				&& (method_exists($classname, $fn = $this->actionCase($method, $args[1]))
+						|| method_exists($classname, $fn = $this->actionCase('', $args[1])))) {
 			array_splice($args, 1, 1);
 			$route = [$classname, $fn, $args];
 
@@ -216,7 +216,7 @@ class Router {
 	 * @param string $arg The argument
 	 * @return string The result
 	 */
-	protected static function classCase(string $arg): string {
+	private function classCase(string $arg): string {
 		if (strpbrk($arg, '-.'))
 			return strtr(ucwords($arg, '-.'), ['-' => '', '.' => '']);
 		return ucfirst($arg);
@@ -228,7 +228,7 @@ class Router {
 	 * @param string $arg The argument
 	 * @return string The result
 	 */
-	protected static function actionCase(string $method, string $arg): string {
+	private function actionCase(string $method, string $arg): string {
 		if (strpbrk($arg, '-.'))
 			return strtr(lcfirst($method.ucwords($arg, '-.')), ['-' => '', '.' => '']);
 		return ($method ? $method.ucfirst($arg) : $arg);

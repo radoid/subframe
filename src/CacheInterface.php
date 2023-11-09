@@ -17,11 +17,11 @@ interface CacheInterface {
 	/**
 	 * Stores an item
 	 * @param string $name The item's filename
-	 * @param string $content The content
+	 * @param mixed $content The item's content
 	 * @param int|null $ttl Duration in seconds, or default time will be used
 	 * @return bool true on success or false on failure
 	 */
-	public function set(string $name, string $content, ?int $ttl = null): bool;
+	public function set(string $name, $content, ?int $ttl = null): bool;
 
 	/**
 	 * Retrieves an item, if it exists and is not expired, or the default value otherwise

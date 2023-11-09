@@ -97,13 +97,13 @@ class App {
 	 * @param string|array $filename The view's filename
 	 */
 	public function catchView($filename, array $data = []): self {
-		$middleware = function (Request $request, Closure $next) use ($filename, $data): ResponseInterface {
+		$this->middlewareHandler->add(function (Request $request, Closure $next) use ($filename, $data): ResponseInterface {
 			try {
 				$response = $next($request);
 			} catch (Throwable $e) {
 				$code = $e->getCode();
 				$code = (is_numeric($code) && $code >= 400 && $code < 500 ? $code : 500);
-				if ($code == 500)
+				if ($code >= 500)
 					error_log('PHP exception "'.$e->getMessage().'"; stack trace: '.$e->getTraceAsString().' thrown in '.$e->getFile().', line '.$e->getLine().'; URI: '.$request->getUri());
 				if (is_array($filename))
 					$filename = $filename[$code] ?? $filename[0] ?? null;
@@ -113,8 +113,7 @@ class App {
 					$response = Response::fromView($filename, ['error' => $e->getMessage()] + $data, $code);
 			}
 			return $response;
-		};
-		$this->middlewareHandler->add($middleware);
+		});
 
 		return $this;
 	}
@@ -123,15 +122,14 @@ class App {
 	 * Defines a closure that is to be called in case of an uncaught exception
 	 */
 	public function catch(Closure $closure): self {
-		$middleware = function (Request $request, Closure $next) use ($closure): ResponseInterface {
+		$this->middlewareHandler->add(function (Request $request, Closure $next) use ($closure): ResponseInterface {
 			try {
 				$response = $next($request);
 			} catch (Throwable $e) {
 				$response = $closure($e);
 			}
 			return $response;
-		};
-		$this->middlewareHandler->add($middleware);
+		});
 
 		return $this;
 	}

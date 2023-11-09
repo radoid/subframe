@@ -4,7 +4,7 @@ namespace Subframe;
 use Exception;
 
 /**
- * Image functions
+ * Simple image functions
  * @package Subframe PHP Framework
  */
 class Image {
@@ -16,17 +16,20 @@ class Image {
 	private $width, $height;
 
 	/** @var array|null */
-	private $exif;
+	private $exif = null;
+
+	/** @var bool */
+	private $isModified = false;
 
 
 	/**
 	 * The constructor
-	 * @param string $source Image file
+	 * @param string $source Image file path
 	 * @throws Exception
 	 */
 	public function __construct(string $source) {
 		if (!extension_loaded('gd'))
-			throw new Exception("GD PHP extension is required.", 500);
+			throw new Exception('GD PHP extension is required.', 500);
 		if (!is_readable($source))
 			throw new Exception("File $source not found.", 500);
 
@@ -41,7 +44,7 @@ class Image {
 			throw new Exception("File $source is not an image.", 500);
 
 		if (function_exists('exif_read_data'))
-			$this->exif = exif_read_data($source) ?: null;
+			$this->exif = @exif_read_data($source) ?: null;
 
 		if ($type == IMAGETYPE_GIF)
 			$this->image = imagecreatefromgif($source);
@@ -76,8 +79,12 @@ class Image {
 		return $this->exif[$key] ?? null;
 	}
 
+	public function isModified(): bool {
+		return $this->isModified;
+	}
+
 	/**
-	 * Takes an image or part of it and saves it in another size
+	 * Takes an image or part of it and resamples it into the given area
 	 * @param int $destWidth
 	 * @param int $destHeight
 	 * @param int|null $srcX
@@ -94,22 +101,21 @@ class Image {
 		if (!imagecopyresampled($dest, $this->image, 0, 0, $srcX ?? 0, $srcY ?? 0, $destWidth, $destHeight, $srcWidth ?? $this->width, $srcHeight ?? $this->height))
 			throw new Exception('Cannot resample the image.', 500);
 		$this->image = $dest;
-		$this->dirty = true;
+		$this->isModified = true;
 
 		return $this;
 	}
 
 	/**
 	 * Rotates the image
-	 * @param float $angle
-	 * @return Image
+	 * @param float $angle Rotation angle in degrees, anti-clockwise
 	 * @throws Exception
 	 */
 	public function rotate(float $angle): self {
 		$this->image = imagerotate($this->image, $angle, 0);
 		if (!$this->image)
 			throw new Exception('Cannot rotate image.', 500);
-		$this->dirty = true;
+		$this->isModified = true;
 
 		return $this;
 	}
@@ -156,19 +162,18 @@ class Image {
 
 	/**
 	 * Saves the image into a file
-	 * @param string|null $destination
-	 * @param int $destinationType
-	 * @param int $quality
-	 * @return Image
+	 * @param string|null $destination The path to save the file to
+	 * @param int $destinationType PHP image type constant
+	 * @param int $jpegQuality quality value from 0 (worst) to 100 (best), if JPEG type
 	 * @throws Exception
 	 */
-	function save(string $destination, int $destinationType = IMAGETYPE_JPEG, int $quality = 98): self {
+	function save(string $destination, int $destinationType = IMAGETYPE_JPEG, int $jpegQuality = 98): self {
 		if ($destinationType == IMAGETYPE_GIF)
 			$isSuccess = imagegif($this->image, $destination);
 		elseif ($destinationType == IMAGETYPE_PNG)
 			$isSuccess = imagepng($this->image, $destination);
 		else
-			$isSuccess = imagejpeg($this->image, $destination, $quality);
+			$isSuccess = imagejpeg($this->image, $destination, $jpegQuality);
 		if (!$isSuccess)
 			throw new Exception("Cannot write to $destination.", 500);
 
