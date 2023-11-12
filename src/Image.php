@@ -121,40 +121,47 @@ class Image {
 	}
 
 	/**
-	 * Ensures the image doesn't exceed the given size
-	 * @param string $source
+	 * Ensures the image doesn't exceed the given size, preserving the proportions, optionally enlarging it when smaller
 	 * @param int $maxWidth
 	 * @param int $maxHeight
-	 * @param string|null $destination
-	 * @param int $destinationType
-	 * @param bool $canCrop
-	 * @param int $quality
-	 * @return bool true if successful or false in case of an error
+	 * @param bool $canEnlarge
+	 * @return Image
 	 * @throws Exception
 	 */
-	function constrain(int $maxWidth, int $maxHeight, bool $canCrop = false): self {
-		$width = imagesx($this->image);
+	function contain(int $maxWidth, int $maxHeight, bool $canEnlarge = false): self {
+		$width  = imagesx($this->image);
 		$height = imagesy($this->image);
-		if ($width > $maxWidth || $height > $maxHeight) {
-			if ($canCrop) {  // take only the center part to fit new dimensions
-				$destWidth = $maxWidth;
-				$destHeight = $maxHeight;
-				$scale = max($destWidth / $width, $destHeight / $height);
-				$srcWidth = $destWidth / $scale;
-				$srcHeight = $destHeight / $scale;
-				$srcX = ($width - $srcWidth) / 2;
-				$srcY = ($height - $srcHeight) / 2;
-			} else {  // all of the image must fit into the new dimensions
-				$scale = min($maxWidth / $width, $maxHeight / $height);
-				$destWidth = $width * $scale;
-				$destHeight = $height * $scale;
-				$srcWidth = $width;
-				$srcHeight = $height;
-				$srcX = 0;
-				$srcY = 0;
-			}
+		if ($canEnlarge || $width > $maxWidth || $height > $maxHeight) {
+			$scale = min($maxWidth / $width, $maxHeight / $height);
+			$destWidth = round($width * $scale);
+			$destHeight = round($height * $scale);
 
-			$this->resample(round($destWidth), round($destHeight), round($srcX), round($srcY), round($srcWidth), round($srcHeight));
+			$this->resample($destWidth, $destHeight, 0, 0, $width, $height);
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Ensures the image doesn't exceed the given size, cropping the center part if needed
+	 * to best fill the given size, optionally enlarging it when smaller
+	 * @param int $maxWidth
+	 * @param int $maxHeight
+	 * @param bool $canEnlarge
+	 * @return Image
+	 * @throws Exception
+	 */
+	function cover(int $maxWidth, int $maxHeight, bool $canEnlarge = true): self {
+		$width  = imagesx($this->image);
+		$height = imagesy($this->image);
+		if ($canEnlarge || $width > $maxWidth || $height > $maxHeight) {
+			$scale = max($maxWidth / $width, $maxHeight / $height);
+			$srcWidth = round($maxWidth / $scale);
+			$srcHeight = round($maxHeight / $scale);
+			$srcX = round(($width - $srcWidth) / 2);
+			$srcY = round(($height - $srcHeight) / 2);
+
+			$this->resample($maxWidth, $maxHeight, $srcX, $srcY, $srcWidth, $srcHeight);
 		}
 
 		return $this;
