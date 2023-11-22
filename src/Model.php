@@ -356,6 +356,22 @@ class Model extends stdClass {
 	}
 
 	/**
+	 * Executes an SQL query that returns no results
+	 * @param string $sql The query
+	 * @param array|null $params Optional parameters for a prepared statement [optional]
+	 * @return int The number of rows affected
+	 */
+	public static function exec(string $sql, array $params = null): int {
+		if ($params) {
+			$stmt = self::$pdo->prepare($sql);
+			$stmt->execute($params);
+			$affected = $stmt->rowCount();
+		} else
+			$affected = self::$pdo->exec($sql);
+		return $affected;
+	}
+
+	/**
 	 * Escapes and quotes a string
 	 * @param string|string[] $str
 	 * @return string
@@ -366,6 +382,20 @@ class Model extends stdClass {
 		if (!self::$pdo)
 			return "'".addslashes($str)."'";
 		return self::$pdo->quote($str);
+	}
+
+	/**
+	 * Starts a new transaction
+	 */
+	static function begin() {
+		self::$pdo->beginTransaction();
+	}
+
+	/**
+	 * Commits the current transaction
+	 */
+	static function commit() {
+		self::$pdo->commit();
 	}
 
 	/**
