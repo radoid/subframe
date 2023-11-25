@@ -182,6 +182,22 @@ class Request implements RequestInterface {
 	 * @throws Exception
 	 */
 	public function getUploadedFiles(): array {
+		$upload_max_filesize = ini_get('upload_max_filesize');
+		$post_max_size = ini_get('post_max_size');
+
+		if ($this->method == 'POST' && ($this->serverParams['CONTENT_LENGTH'] ?? 0) > 0 && !$this->parsedBody && !$this->files)
+			throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
+
+		foreach ($this->files as $file)
+			foreach ((key_exists('name', $file) ? [$file] : $file) as $file)
+				if ($file['error'])
+					switch ($file['error']) {
+						case UPLOAD_ERR_INI_SIZE:
+							throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
+						default:
+							throw new Exception("Upload failed (error #$file[error]).", 500);
+					}
+
 		return $this->files;
 	}
 
@@ -219,7 +235,7 @@ class Request implements RequestInterface {
 	private static function getGlobalRequestUri(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_URI']))
-			$uri = rawurldecode(strtok($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'], '?'));
+			$uri = rawurldecode(strtok($_SERVER['REQUEST_URI'], '?'));
 		else
 			$uri = '/'.join('/', array_slice($argv, 1));
 
@@ -244,7 +260,7 @@ class Request implements RequestInterface {
 	private static function getGlobalPathInfo(): string {
 		global $argv;
 		if (isset($_SERVER['REQUEST_METHOD'])) {
-			$uri = rawurldecode($_SERVER['ORIG_PATH_INFO'] ?? $_SERVER['PATH_INFO'] ?? '/');
+			$uri = rawurldecode($_SERVER['PATH_INFO'] ?? '/');
 		} else
 			$uri = '/'.join('/', array_slice($argv, 1));
 
@@ -264,36 +280,8 @@ class Request implements RequestInterface {
 							$files[$varname][$i][$key] = $value;
 			} else
 				if ($file['error'] != UPLOAD_ERR_NO_FILE)
-					$files[$varname][] = $file;
+					$files[$varname] = $file;
 
-		if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-			$upload_max_filesize = ini_get('upload_max_filesize');
-			$post_max_size = ini_get('post_max_size');
-
-			if (($server['CONTENT_LENGTH'] ?? 0) > 0 && !$_POST && !$_FILES)
-				throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
-
-			foreach ($files as $varname => $files)
-				foreach ($files as $file)
-					if ($file['error'])
-						switch ($file['error']) {
-							case UPLOAD_ERR_INI_SIZE:
-								throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
-							case UPLOAD_ERR_FORM_SIZE:
-								throw new Exception("\"$file[name]\" is too big.", 400);
-							case UPLOAD_ERR_PARTIAL:
-								throw new Exception("\"$file[name]\" was not uploaded.", 500);
-							case UPLOAD_ERR_NO_TMP_DIR:
-								throw new Exception('No tmp directory.', 500);
-							case UPLOAD_ERR_CANT_WRITE:
-								throw new Exception('Write error.', 500);
-							case UPLOAD_ERR_EXTENSION:
-								throw new Exception('File extension is not allowed.', 500);
-							default:
-								throw new Exception("Upload failed (error $file[error]).", 500);
-						}
-		}
-		
 		return $files;
 	}
 

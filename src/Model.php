@@ -79,7 +79,7 @@ class Model extends stdClass {
 	 * The fields present in the object, as a string suitable for use in SQL queries
 	 * @return string
 	 */
-	public function keys() {
+	public function keys(): string {
 		$keys = "";
 		foreach ($this as $key => $value)
 			if (isset($this->$key))
@@ -91,7 +91,7 @@ class Model extends stdClass {
 	 * The values present in the object, quoted, as a string suitable for use in SQL queries
 	 * @return string
 	 */
-	public function values() {
+	public function values(): string {
 		$values = "";
 		foreach ($this as $key => $value)
 			if (isset($this->$key))
@@ -106,7 +106,7 @@ class Model extends stdClass {
 	 * @param string|null $index Optionally, the field to serve as index
 	 * @return array
 	 */
-	public static function column(array $objects, $field, $index = null) {
+	public static function column(array $objects, string $field, ?string $index = null): array {
 		$array = [];
 		$i = 0;
 		foreach ($objects as $object)
@@ -121,7 +121,7 @@ class Model extends stdClass {
 	 * @param string|null $index Optionally, the field to serve as index
 	 * @return array|object
 	 */
-	public static function columns($objects, array $fields, $index = null) {
+	public static function columns($objects, array $fields, ?string $index = null) {
 		$fields = array_flip($fields);
 		if (is_object($objects))
 			return (object)array_intersect_key((array)$objects, $fields);
@@ -193,9 +193,9 @@ class Model extends stdClass {
 
 	/**
 	 * Updates the record(s) in the DB table, found by the ID(s) from the optional parameter or the object itself
-	 * @param string|string[] $id Optional value looked up in the key column
+	 * @param string|string[]|null $id Optional value looked up in the key column
 	 */
-	public function update($id = '') {
+	public function update($id = null) {
 		$id = ($id ?? $this->{static::KEY});
 		$sql = strval($this);
 		if (is_array($id) && !$id || !$sql)
@@ -265,12 +265,12 @@ class Model extends stdClass {
 	/**
 	 * Fetches all records, optionally paged
 	 * @param int $limit Optionally, maximum number of records
-	 * @param string $after_id Optionally, the last ID from the previous request
-	 * @param int $page Optional page number, starting from zero
-	 * @return static[]|null
+	 * @param int $after_id Optionally, the last ID from the previous request
+	 * @param int|null $page
+	 * @return static[]
 	 * @throws Exception
 	 */
-	public static function getAll($limit = 0, $after_id = '', $page = 0) {
+	public static function getAll(int $limit = 0, int $after_id = 0, int $page = 0): array {
 		$sql = "SELECT * FROM ".static::TABLE
 				.($after_id ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
 				." ORDER BY ".(static::ORDER ?? static::KEY).($limit >= 0 ? " ASC":" DESC")
@@ -295,17 +295,17 @@ class Model extends stdClass {
 	 * Fetches records by direct SQL query, optionally indexed by a column
 	 * @param string|PDOStatement $q The query as an SQL string or PDOStatement
 	 * @param array|null $params Optional parameters for a prepared statement [optional]
-	 * @param string $indexColumn
+	 * @param string|null $indexColumn
 	 * @return static[] The records
 	 * @throws Exception
 	 */
-	public static function fetchAll($q, array $params = null, $indexColumn = '') {
+	public static function fetchAll($q, array $params = null, ?string $indexColumn = null): array {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
-		$classname = (static::class != 'Subframe\Model' ? static::class : 'stdClass');
+		$classname = (static::class != 'Subframe\\Model' ? static::class : 'stdClass');
 		if (!$indexColumn)
 			return $q->fetchAll(PDO::FETCH_CLASS, $classname);
-		for ($objects = []; ($o = $q->fetchObject($classname)); $objects[$o->$indexColumn] = $o);
+		for ($objects = []; ($o = $q->fetchObject($classname)); $objects[$o->$indexColumn] = $o) {}
 		return $objects;
 	}
 
@@ -316,7 +316,7 @@ class Model extends stdClass {
 	 * @return string|null
 	 * @throws Exception
 	 */
-	public static function result($q, array $params = null) {
+	public static function result($q, array $params = null): ?string {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		$result = $q->fetchColumn();
@@ -330,7 +330,7 @@ class Model extends stdClass {
 	 * @return string[]
 	 * @throws Exception
 	 */
-	public static function allResults($q, array $params = null) {
+	public static function allResults($q, array $params = null): array {
 		if (!$q instanceof PDOStatement)
 			$q = self::query($q, $params);
 		return $q->fetchAll(PDO::FETCH_COLUMN);
@@ -343,13 +343,11 @@ class Model extends stdClass {
 	 * @return PDOStatement
 	 * @throws Exception
 	 */
-	public static function query(string $sql, array $params = null) {
+	public static function query(string $sql, array $params = null): PDOStatement {
 		if ($params)
 			$stmt = self::$pdo->prepare($sql);
 		else
 			$stmt = self::$pdo->query($sql);
-		if (!$stmt)
-			throw new Exception(self::$pdo->errorInfo()[2], 500);
 		if ($params)
 			$stmt->execute($params);
 		return $stmt;
@@ -376,12 +374,12 @@ class Model extends stdClass {
 	 * @param string|string[] $str
 	 * @return string
 	 */
-	public static function quote($str) {
+	public static function quote($str): string {
 		if (is_array($str))
 			return implode(',', array_map([self::class, 'quote'], $str));
 		if (!self::$pdo)
-			return "'".addslashes($str)."'";
-		return self::$pdo->quote($str);
+			return "'".addslashes($str ?? '')."'";
+		return self::$pdo->quote($str ?? '');
 	}
 
 	/**
