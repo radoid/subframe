@@ -36,16 +36,6 @@ class Controller {
 	}
 
 	/**
-	 * Throws an exception
-	 * @param string $message The message of the exception
-	 * @param int $code The code of the exception
-	 * @throws Exception
-	 */
-	protected function throw(string $message, int $code = 500): void {
-		throw new Exception($message, $code);
-	}
-
-	/**
 	 * Redirects the request to another URL
 	 * @param string $url The URL to go to
 	 * @param int $code HTTP status code, such as 301; defaults to 302
@@ -84,6 +74,48 @@ class Controller {
 			}
 		
 		header('Last-Modified: '.date('r', $timestamp));
+	}
+
+	/**
+	 * Tells whether the request is intended for JSON response
+	 */
+	protected function acceptsJson(): bool {
+		return strpos($_SERVER['HTTP_ACCEPT'] ?? '', '/json') !== false;
+	}
+
+	/**
+	 * Obtains uploaded files array in a normalized form; empty files are not present in the resulting array
+	 * @throws Exception in case of an upload error
+	 */
+	protected function getFiles(): array {
+		$upload_max_filesize = ini_get('upload_max_filesize');
+		$post_max_size = ini_get('post_max_size');
+
+		if ($_SERVER['REQUEST_METHOD'] == 'POST' && ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0 && !$_POST && !$_FILES)
+			throw new Exception("Total upload size exceeds limit ($post_max_size).", 400);
+
+		$files = [];
+		foreach ($_FILES as $varname => $file)
+			if (is_array($file['name'])) {
+				foreach ($file as $key => $array)
+					foreach ($array as $i => $value)
+						if ($file['error'][$i] != UPLOAD_ERR_NO_FILE)
+							$files[$varname][$i][$key] = $value;
+			} else
+				if ($file['error'] != UPLOAD_ERR_NO_FILE)
+					$files[$varname] = $file;
+
+		foreach ($files as $file)
+			foreach ((key_exists('name', $file) ? [$file] : $file) as $file)
+				if ($file['error'])
+					switch ($file['error']) {
+						case UPLOAD_ERR_INI_SIZE:
+							throw new Exception("File \"$file[name]\" exceeds size limit ($upload_max_filesize).", 422);
+						default:
+							throw new Exception("Unexpected error #$file[error] during upload.", 500);
+					}
+		
+		return $files;
 	}
 
 }
