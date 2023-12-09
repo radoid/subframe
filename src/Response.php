@@ -1,6 +1,8 @@
 <?php
 namespace Subframe;
 
+use Throwable;
+
 /**
  * Represents a response to an HTTP request
  */
@@ -46,14 +48,19 @@ class Response implements ResponseInterface {
 		$error_reporting = error_reporting(error_reporting() & ~E_NOTICE & ~E_WARNING);
 		ob_start();
 
-		(function ($_filename, $_data) {
-			extract($_data);
-			require "$_filename.php";
-		})($filename, $data);
+		try {
+			(function ($_filename, $_data) {
+				extract($_data);
+				require "$_filename.php";
+			})($filename, $data);
+		} catch (Throwable $exception) {}
 
 		$output = ob_get_clean();
 		error_reporting($error_reporting);
 
+		if (isset($exception))
+			throw $exception;
+		
 		return new Response($output, $statusCode, []);
 	}
 
