@@ -179,8 +179,13 @@ class Model extends stdClass {
 	 * @return int The number of affected rows
 	 */
 	public function upsert(): int {
-		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
-				ON DUPLICATE KEY UPDATE $this";
+		$driver = self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+		if ($driver == 'sqlite')
+			$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
+					ON CONFLICT DO UPDATE SET $this";
+		else
+			$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
+					ON DUPLICATE KEY UPDATE $this";
 		return self::$pdo->exec($sql);
 	}
 
