@@ -123,6 +123,7 @@ class Request implements RequestInterface {
 	 */
 	public function getHeader(string $name): ?string {
 		$name = ucwords(strtolower($name), '-');
+		$name = ($name == 'Etag' ? 'ETag' : $name);
 		return $this->headers[$name] ?? null;
 	}
 

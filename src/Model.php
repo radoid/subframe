@@ -207,7 +207,7 @@ class Model extends stdClass {
 		$id = ($id ?? $this->{static::KEY});
 		$sql = strval($this);
 		if (is_array($id) && !$id || !$sql)
-			return;
+			return 0;
 		$sql = "UPDATE ".static::TABLE." SET $sql WHERE ".static::KEY." IN (".self::quote($id).")";
 		return self::$pdo->exec($sql);
 	}
@@ -219,7 +219,7 @@ class Model extends stdClass {
 	 * @return int The number of affected rows
 	 */
 	public static function set($id, $data): int {
-		if (is_array($id) && !count($id))
+		if (is_array($id) && !$id)
 			return 0;
 		return (new static($data))->update($id);
 	}
@@ -231,7 +231,7 @@ class Model extends stdClass {
 	 */
 	public static function delete($id): int {
 		if (is_array($id) && !$id)
-			return;
+			return 0;
 		$sql = "DELETE FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
 		return self::$pdo->exec($sql);
 	}
