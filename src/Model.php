@@ -174,53 +174,64 @@ class Model extends stdClass {
 
 	/**
 	 * Inserts the object into the DB table, updating the existing record if there's a duplicate key
+	 * @return int The number of affected rows
 	 */
-	public function upsert() {
-		$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
-				ON DUPLICATE KEY UPDATE $this";
-		self::$pdo->exec($sql);
+	public function upsert(): int {
+		$driver = self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+		if ($driver == 'sqlite')
+			$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
+					ON CONFLICT DO UPDATE SET $this";
+		else
+			$sql = "INSERT INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")
+					ON DUPLICATE KEY UPDATE $this";
+		return self::$pdo->exec($sql);
 	}
 
 	/**
 	 * Inserts the object into the DB table, fully replacing the existing record if there's a duplicate key
+	 * @return int The number of affected rows
 	 */
-	public function replace() {
+	public function replace(): int {
 		$sql = "REPLACE INTO ".static::TABLE."(".$this->keys().") VALUES (".$this->values().")";
-		self::$pdo->exec($sql);
+		return self::$pdo->exec($sql);
 	}
 
 	/**
 	 * Updates the record(s) in the DB table, found by the ID(s) from the optional parameter or the object itself
 	 * @param string|string[]|null $id Optional value looked up in the key column
+	 * @return int The number of affected rows
 	 */
-	public function update($id = null) {
+	public function update($id = null): int {
 		$id = ($id ?? $this->{static::KEY});
 		$sql = strval($this);
-		if (is_array($id) && !$id || !$sql)
-			return;
+		if ((is_array($id) && !$id) || !$sql)
+			return 0;
 		$sql = "UPDATE ".static::TABLE." SET $sql WHERE ".static::KEY." IN (".self::quote($id).")";
-		self::$pdo->exec($sql);
+		return self::$pdo->exec($sql);
 	}
 
 	/**
 	 * Updates only selected columns, as given by the data array/object, in the DB record(s) identified by the ID(s)
 	 * @param string|string[] $id
 	 * @param array|object $data
+	 * @return int The number of affected rows
 	 */
-	public static function set($id, $data) {
-		if ($id || !is_array($id))
-			(new static($data))->update($id);
+	public static function set($id, $data): int {
+		if (is_array($id) && !$id)
+			return 0;
+		return (new static($data))->update($id);
 	}
 
 	/**
 	 * Deletes DB record(s) identified by the ID(s)
 	 * @param string|string[] $id
+	 * @return int The number of affected rows
 	 */
-	public static function delete($id) {
+	public static function delete($id): int {
 		if (is_array($id) && !$id)
-			return;
+			return 0;
 		$sql = "DELETE FROM ".static::TABLE." WHERE ".static::KEY." IN (".self::quote($id).")";
-		self::$pdo->exec($sql);
+		return self::$pdo->exec($sql);
 	}
 
 	/**
@@ -263,14 +274,14 @@ class Model extends stdClass {
 	/**
 	 * Fetches all records, optionally paged
 	 * @param int $limit Optionally, maximum number of records
-	 * @param int $after_id Optionally, the last ID from the previous request
+	 * @param string $after_id Optionally, the last ID from the previous request
 	 * @param int|null $page
 	 * @return static[]
 	 * @throws Exception
 	 */
-	public static function getAll(int $limit = 0, int $after_id = 0, int $page = 0): array {
+	public static function getAll(int $limit = 0, $after_id = null, int $page = 0): array {
 		$sql = "SELECT * FROM ".static::TABLE
-				.($after_id ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
+				.(isset($after_id) ? " WHERE ".static::KEY.($limit > 0 ? " > ":" < ").self::quote($after_id) : "")
 				." ORDER BY ".(static::ORDER ?? static::KEY).($limit >= 0 ? " ASC":" DESC")
 				.($limit ? " LIMIT ".($page ? abs($page*$limit).',':'') . abs($limit) : "");
 		return static::fetchAll($sql);
