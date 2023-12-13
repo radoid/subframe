@@ -59,7 +59,7 @@ class ResponseTest extends TestCase {
 
 	public function testFromData() {
 		$data = ['ante' => 'frane'];
-		$response = Response::fromData($data, 202);
+		$response = Response::fromJson($data, 202);
 		self::assertEquals(202, $response->getStatusCode());
 		self::assertEquals(json_encode($data), $response->getBody());
 		self::assertStringContainsString('application/json', $response->getHeader('content-type'));

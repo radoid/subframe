@@ -67,15 +67,15 @@ class Response implements ResponseInterface {
 	/**
 	 * Creates a JSON response from an array
 	 */
-	public static function fromData(array $data = [], int $statusCode = 200): Response {
+	public static function fromJson(array $data = [], int $statusCode = 200): Response {
 		return new Response(json_encode($data, JSON_FORCE_OBJECT), $statusCode, ['Content-Type' => 'application/json; charset=utf-8']);
 	}
 
 	/**
-	 * Constructs a Response with only "Location" header field
+	 * Constructs a Response with a "Location:" header field
 	 */
-	public static function fromLocation(string $location, int $statusCode = 302): self {
-		return new self('', $statusCode, ['Location' => $location]);
+	public static function fromRedirection(string $url, int $statusCode = 302): self {
+		return new self('', $statusCode, ['Location' => $url]);
 	}
 
 	/**

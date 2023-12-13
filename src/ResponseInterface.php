@@ -41,14 +41,4 @@ interface ResponseInterface {
 	 */
 	public function send(): void;
 
-	/**
-	 * Creates a response from a view
-	 */
-	public static function fromView(string $filename, array $data = [], int $statusCode = 200): Response;
-
-	/**
-	 * Creates a JSON response from an array
-	 */
-	public static function fromData(array $data = [], int $statusCode = 200): Response;
-
 }

@@ -108,7 +108,7 @@ class App {
 				if (is_array($filename))
 					$filename = $filename[$code] ?? $filename[0] ?? null;
 				if ($request->acceptsJson())
-					$response = Response::fromData(['error' => $e->getMessage()], $code)
+					$response = Response::fromJson(['error' => $e->getMessage()], $code)
 							->withHeader('Cache-Control', 'no-store, must-revalidate');
 				else
 					$response = Response::fromView($filename, ['error' => $e->getMessage()] + $data, $code)

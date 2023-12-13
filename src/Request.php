@@ -72,7 +72,7 @@ class Request implements RequestInterface {
 	 * @throws Exception
 	 */
 	public static function fromGlobalRequestUri(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRequestUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, getallheaders());
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRequestUri(), $_GET, $_POST, $_COOKIE, self::getGlobalFiles(), $_SERVER, getallheaders());
 	}
 
 	/**
@@ -81,7 +81,7 @@ class Request implements RequestInterface {
 	 * @throws Exception
 	 */
 	public static function fromGlobalRelativeUri(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRelativeUri(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, getallheaders());
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalRelativeUri(), $_GET, $_POST, $_COOKIE, self::getGlobalFiles(), $_SERVER, getallheaders());
 	}
 
 	/**
@@ -90,7 +90,7 @@ class Request implements RequestInterface {
 	 * @throws Exception
 	 */
 	public static function fromGlobalPathInfo(): self {
-		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalPathInfo(), $_GET, $_POST, $_COOKIE, self::getGlobalUploadedFiles(), $_SERVER, getallheaders());
+		return new self($_SERVER['REQUEST_METHOD'] ?? 'GET', self::getGlobalPathInfo(), $_GET, $_POST, $_COOKIE, self::getGlobalFiles(), $_SERVER, getallheaders());
 	}
 
 	/**
@@ -181,7 +181,7 @@ class Request implements RequestInterface {
 	 * @return array
 	 * @throws Exception
 	 */
-	public function getUploadedFiles(): array {
+	public function getFiles(): array {
 		$upload_max_filesize = ini_get('upload_max_filesize');
 		$post_max_size = ini_get('post_max_size');
 
@@ -270,7 +270,7 @@ class Request implements RequestInterface {
 	/**
 	 * Obtains the list of uploaded files
 	 */
-	private static function getGlobalUploadedFiles(): array {
+	private static function getGlobalFiles(): array {
 		$files = [];
 		foreach ($_FILES as $varname => $file)
 			if (is_array($file['name'])) {

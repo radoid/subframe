@@ -68,7 +68,7 @@ interface RequestInterface {
 	 * All uploaded files definitions in a normalized form
 	 * @return array
 	 */
-	public function getUploadedFiles(): array;
+	public function getFiles(): array;
 
 	/**
 	 * Remote address the request was made from, taking X-Forwarded-For header field into accout
