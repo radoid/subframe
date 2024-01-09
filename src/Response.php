@@ -68,7 +68,12 @@ class Response implements ResponseInterface {
 	 * Creates a JSON response from an array
 	 */
 	public static function fromJson(array $data = [], int $statusCode = 200): Response {
-		return new Response(json_encode($data, JSON_FORCE_OBJECT), $statusCode, ['Content-Type' => 'application/json; charset=utf-8']);
+		$content = json_encode((object)$data);
+		$headers = [
+			'Content-Type' => 'application/json; charset=utf-8',
+			'Content-Length' => strlen($content),
+		];
+		return new Response($content, $statusCode, $headers);
 	}
 
 	/**

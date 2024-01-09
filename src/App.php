@@ -29,7 +29,7 @@ class App {
 			$response = $this->router->handle($request);
 			if ($response)
 				return $response;
-			throw new Exception('Route not found.', 404);
+			throw new Exception('Page not found.', 404);
 		};
 
 		$this->middlewareHandler = new MiddlewareHandler(array_merge([$routerMiddleware], $middlewares));
@@ -102,19 +102,19 @@ class App {
 				$response = $next($request);
 			} catch (Throwable $e) {
 				$code = $e->getCode();
-				$code = (is_numeric($code) && $code >= 400 && $code < 500 ? $code : 500);
+				$code = (is_numeric($code) && $code >= 400 && $code < 600 ? $code : 500);
+				$data['error'] = $e->getMessage();
 				if ($code >= 500)
-					error_log('PHP exception "'.$e->getMessage().'"; stack trace: '.$e->getTraceAsString().' thrown in '.$e->getFile().', line '.$e->getLine().'; URI: '.$request->getUri());
+					error_log((string)$e . ' at ' . $request->getUri());
 				if (is_array($filename))
 					$filename = $filename[$code] ?? $filename[0] ?? null;
 				if ($request->acceptsJson())
-					$response = Response::fromJson(['error' => $e->getMessage()], $code)
-							->withHeader('Cache-Control', 'no-store, must-revalidate');
+					$response = Response::fromJson($data, $code);
 				else
-					$response = Response::fromView($filename, ['error' => $e->getMessage()] + $data, $code)
-							->withHeader('Cache-Control', 'no-store, must-revalidate');
+					$response = Response::fromView($filename, $data, $code);
 			}
-			return $response;
+			return $response
+					->withHeader('Cache-Control', 'no-store, must-revalidate');
 		});
 
 		return $this;
