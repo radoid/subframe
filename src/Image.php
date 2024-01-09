@@ -44,7 +44,7 @@ class Image {
 			throw new Exception("File $source is not an image.", 500);
 
 		if (function_exists('exif_read_data'))
-			$this->exif = exif_read_data($source) ?: null;
+			$this->exif = @exif_read_data($source) ?: null;
 
 		if ($type == IMAGETYPE_GIF)
 			$this->image = imagecreatefromgif($source);

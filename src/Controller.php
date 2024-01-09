@@ -32,7 +32,7 @@ class Controller {
 	protected function json(array $data = [], int $status = 200): void {
 		http_response_code($status);
 		header('Content-Type: application/json');
-		die(json_encode($data));
+		die(json_encode($data, JSON_FORCE_OBJECT));
 	}
 
 	/**
