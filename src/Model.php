@@ -163,6 +163,12 @@ class Model extends stdClass {
 	public static $pdo;
 
 	/**
+	 * Current transaction level
+	 * @var int
+	 */
+	public static $transactionLevel = 0;
+
+	/**
 	 * Inserts the object into the DB table
 	 * @return string The insert ID
 	 */
@@ -395,14 +401,17 @@ class Model extends stdClass {
 	 * Starts a new transaction
 	 */
 	static function begin() {
-		self::$pdo->beginTransaction();
+		if (self::$transactionLevel++ == 0)
+			self::$pdo->beginTransaction();
 	}
 
 	/**
 	 * Commits the current transaction
 	 */
 	static function commit() {
-		self::$pdo->commit();
+		if (self::$transactionLevel == 1)
+			self::$pdo->commit();
+		self::$transactionLevel = max(0, self::$transactionLevel - 1);
 	}
 
 	/**
