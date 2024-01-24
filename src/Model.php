@@ -20,14 +20,13 @@ class Model extends stdClass {
 	 * @param array|object|null $data object or associative array with initial data
 	 */
 	public function __construct($data = null) {
-		if (is_array ($data)) {
+		if (is_object($data))
+			$data = (array)$data;
+		if (is_array($data)) {
 			foreach ($this as $key => $value)
-				if (isset($data[$key]))
+				if (isset($data[$key]) && (!static::GUARDED || !in_array($key, static::GUARDED)))
 					$this->$key = $data[$key];
-		} elseif (is_object ($data))
-			foreach ($this as $key => $value)
-				if (isset($data->$key))
-					$this->$key = $data->$key;
+		}
 	}
 
 	/**
@@ -150,6 +149,12 @@ class Model extends stdClass {
 	 * @var string
 	 */
 	public const ORDER = null;
+
+	/**
+	 * Columns that can't be assigned values via the constructor
+	 * @var ?array
+	 */
+	public const GUARDED = null;
 
 	/**
 	 * Represents NULL value in the database
