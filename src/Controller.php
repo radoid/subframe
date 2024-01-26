@@ -30,9 +30,28 @@ class Controller {
 	 * @param int $status Optional HTTP status code
 	 */
 	protected function json(array $data = [], int $status = 200): void {
+		$json = json_encode((object)$data);
 		http_response_code($status);
 		header('Content-Type: application/json');
-		die(json_encode($data, JSON_FORCE_OBJECT));
+		header('Content-Length: '.strlen($json));
+		echo $json;
+	}
+
+	/**
+	 * Flushes the response to the client, e.g. to allow a long processing task to continue
+	 * @param string $url The URL to go to
+	 * @param int $code HTTP status code, such as 301; defaults to 302
+	 */
+	protected function finish() {
+		while (ob_get_level())
+			ob_end_flush();
+		flush();
+		ignore_user_abort(true);
+		set_time_limit(0);
+		if (function_exists('fastcgi_finish_request')) {
+			session_write_close();
+			fastcgi_finish_request();
+		}
 	}
 
 	/**
