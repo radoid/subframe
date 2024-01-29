@@ -20,8 +20,8 @@ class Router {
 	/**
 	 * Adds a route defined with 3 components
 	 */
-	public function addRoute(string $method, string $uri, $action, array $classArgs = []): self {
-		$this->routes[] = [$method, $uri, $action, $classArgs];
+	public function addRoute(string $method, string $uri, $action): self {
+		$this->routes[] = [$method, $uri, $action];
 
 		return $this;
 	}
@@ -38,8 +38,8 @@ class Router {
 	/**
 	 * Adds a namespace with its classes as routes
 	 */
-	public function addNamespace(string $namespace, array $classArgs = []): self {
-		$this->routes[] = [null, null, $namespace, $classArgs];
+	public function addNamespace(string $namespace): self {
+		$this->routes[] = [null, null, $namespace];
 
 		return $this;
 	}
@@ -48,13 +48,15 @@ class Router {
 	 * Tries to dispatch the given request among defined routes, returns one's Response if found
 	 */
 	public function handle(RequestInterface $request): ?Response {
-		foreach ($this->routes as [$method, $uri, $action, $classArgs]) {
+		Container::set(RequestInterface::class, $request);
+		
+		foreach ($this->routes as [$method, $uri, $action]) {
 			if ($method)
-				$response = $this->tryRoute($request, $method, $uri, $action, $classArgs);
+				$response = $this->tryRoute($request, $method, $uri, $action);
 			elseif ($uri !== null)
-				$response = $this->tryViewRoute($request, $uri, $action, $classArgs);
+				$response = $this->tryViewRoute($request, $uri, $action);
 			else
-				$response = $this->tryNamespace($request, $action, $classArgs);
+				$response = $this->tryNamespace($request, $action);
 			if ($response)
 				return $response;
 		}
@@ -67,10 +69,10 @@ class Router {
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 */
-	private function tryNamespace(RequestInterface $request, string $namespace, array $classArgs = []): ?Response {
+	private function tryNamespace(RequestInterface $request, string $namespace): ?Response {
 		if (($route = $this->findRouteInNamespace($request, $namespace))) {
 			[$class, $action, $args] = $route;
-			$instance = new $class($request, ...$classArgs);
+			$instance = Container::get($class);
 			$response = $this->captureResponse([$instance, $action], $args);
 		} else
 			$response = null;
@@ -87,15 +89,16 @@ class Router {
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @return ?Response
 	 */
-	private function tryRoute(RequestInterface $request, string $method, string $uri, $callable, array $classArgs = []): ?Response {
+	private function tryRoute(RequestInterface $request, string $method, string $uri, $callable): ?Response {
 		$requestUri = '/' . trim(strtok($request->getUri(), '?'), '/');
 		
 		if ($method == $request->getMethod() && preg_match("~^$uri$~", $requestUri, $matches)) {
+			$args = array_slice($matches, 1);
 			if (is_string($callable) && strpos($callable, '@') !== false)
 				$callable = explode('@', $callable);
 			if (is_array($callable) && is_string($callable[0]))
-				$callable[0] = new $callable[0]($request, ...$classArgs);
-			$args = array_slice($matches, 1);
+				if (self::findArguments($callable[0], $callable[1], $args))
+					$callable[0] = Container::get($callable[0]);
 
 			$response = $this->captureResponse($callable, $args);
 		} else
@@ -199,16 +202,33 @@ class Router {
 		} else if (method_exists($classname, $fn = $method))
 			$route = [$classname, $fn, $args];
 
-		if (isset($route))
-			try {
-				$r = new ReflectionClass($classname);
-				$m = $r->getMethod($route[1]);
-				if ($m->isPublic() && $m->getNumberOfRequiredParameters() <= count($route[2]) && $m->getNumberOfParameters() >= count($route[2]))
-					return $route;
-			}
-			catch (Throwable $ignored) {}
+		if (isset($route) && $this->findArguments($route[0], $route[1], $route[2]))
+			return $route;
+		else
+			return null;
+	}
 
-		return null;
+	private function findArguments(string $class, string $fn, array &$args): bool {
+		// try {
+		$r = new ReflectionClass($class);
+		$m = $r->getMethod($fn);
+		$paramCount = $requiredCount = 0;
+		foreach ($m->getParameters() as $p)
+			if (!$p->getType() || $p->getType()->isBuiltin()) {
+				$paramCount += 1;
+				$requiredCount += ($p->isOptional() ? 0 : 1);
+			}
+		if (count($args) >= $requiredCount && count($args) <= $paramCount) {
+			foreach ($m->getParameters() as $i => $p)
+				if ($p->getType() && !$p->getType()->isBuiltin()) {
+					$object = Container::get($p->getType()->getName());
+					array_splice($args, $i, 0, [$object]);
+				}
+			return true;
+		}
+		// catch (Throwable $ignored) {}
+
+		return false;
 	}
 
 	/**
