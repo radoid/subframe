@@ -109,54 +109,41 @@ class Request implements RequestInterface {
 	}
 
 	/**
-	 * All header fields in the request
-	 * @return string[]
+	 * Specific header field's value, or all fields as an associative array
+	 * @param ?string $name
+	 * @return string|array|null
 	 */
-	public function getHeaders(): array {
-		return $this->headers;
-	}
-
-	/**
-	 * Specific header field's value
-	 * @param string $name
-	 * @return string|null
-	 */
-	public function getHeader(string $name): ?string {
-		$name = ucwords(strtolower($name), '-');
-		$name = ($name == 'Etag' ? 'ETag' : $name);
-		return $this->headers[$name] ?? null;
-	}
-
-	/**
-	 * All query (GET) parameters in the request
-	 */
-	public function getQueryParams(): array {
-		return $this->queryParams;
-	}
-
-	/**
-	 * All (POST) variables from the request's body
-	 */
-	public function getParsedBody(): array {
-		return $this->parsedBody;
+	public function getHeader(?string $name = null) {
+		if (isset($name)) {
+			$name = ucwords(strtolower($name), '-');
+			$name = ($name == 'Etag' ? 'ETag' : $name);
+			return $this->headers[$name] ?? null;
+		} else
+			return $this->headers;
 	}
 
 	/**
 	 * Returns a query (GET) parameter by name, or all parameters
 	 * @param string|null $name
-	 * @return string|string[]|null
+	 * @return string|array|null
 	 */
-	public function get(?string $name = null) {
-		return (isset($name) ? $this->queryParams[$name] ?? null : $this->queryParams);
+	public function getQuery(?string $name = null) {
+		if (isset($name))
+			return $this->queryParams[$name] ?? null;
+		else
+			return $this->queryParams;
 	}
 
 	/**
 	 * Returns a (POST) variable from the body by name, or all variables
 	 * @param string|null $name
-	 * @return string|string[]|null
+	 * @return string|array|null
 	 */
-	public function post(?string $name = null) {
-		return (isset($name) ? $this->parsedBody[$name] ?? null : $this->parsedBody);
+	public function getPost(?string $name = null) {
+		if (isset($name))
+			return $this->parsedBody[$name] ?? null;
+		else
+			return $this->parsedBody;
 	}
 
 	/**
@@ -164,25 +151,31 @@ class Request implements RequestInterface {
 	 * @param string|null $name
 	 * @return string|string[]|null
 	 */
-	public function cookie(?string $name = null) {
-		return (isset($name) ? $this->cookies[$name] ?? null : $this->cookies);
+	public function getCookie(?string $name = null) {
+		if (isset($name))
+			return $this->cookies[$name] ?? null;
+		else
+			return $this->cookies;
 	}
 
 	/**
-	 * Returns an uploaded file definition by name
+	 * Returns a parameter from the $_SERVER array, if present in the request
 	 * @param string|null $name
-	 * @return string|string[]|null
+	 * @return string|array|null
 	 */
-	public function file(string $name): ?array {
-		return $this->files[$name] ?? null;
+	public function getServer(?string $name = null) {
+		if (isset($name))
+			return $this->serverParams[$name] ?? null;
+		else
+			return $this->serverParams;
 	}
 
 	/**
-	 * All uploaded files definitions in a normalized form
-	 * @return array
+	 * Returns an array representing the named uploaded file, or all files
+	 * @return array|null
 	 * @throws Exception
 	 */
-	public function getFiles(): array {
+	public function getFiles(?string $name = null): ?array {
 		$upload_max_filesize = ini_get('upload_max_filesize');
 		$post_max_size = ini_get('post_max_size');
 
@@ -191,15 +184,13 @@ class Request implements RequestInterface {
 
 		foreach ($this->files as $file)
 			foreach ((key_exists('name', $file) ? [$file] : $file) as $file)
-				if ($file['error'])
-					switch ($file['error']) {
-						case UPLOAD_ERR_INI_SIZE:
-							throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
-						default:
-							throw new Exception("Upload failed (error #$file[error]).", 500);
-					}
+				if (!isset($name) || $file['name'] == $name)
+					if ($file['error'] == UPLOAD_ERR_INI_SIZE)
+						throw new Exception("\"$file[name]\" exceeds size limit ($upload_max_filesize).", 400);
+					elseif ($file['error'])
+						throw new Exception("Upload failed (error #$file[error]).", 500);
 
-		return $this->files;
+		return (isset($name) ? $this->files[$name] ?? null : $this->files);
 	}
 
 	/**
@@ -218,7 +209,7 @@ class Request implements RequestInterface {
 	 * Tells whether the request was made with XMLHttpRequest (an AJAX request)
 	 * @return boolean
 	 */
-	public function isAjax(): bool {
+	public function isXmlHttpRequest(): bool {
 		return ($this->serverParams['HTTP_X_REQUESTED_WITH'] ?? '') == 'XMLHttpRequest';
 	}
 

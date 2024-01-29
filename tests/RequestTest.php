@@ -54,7 +54,7 @@ class RequestTest extends TestCase {
 	}
 
 	public function testGetHeaders() {
-		$headers = $this->request2->getHeaders();
+		$headers = $this->request2->getHeader();
 		$this->assertEquals('application/x-www-form-urlencoded', $headers['Content-Type']);
 	}
 
@@ -64,28 +64,28 @@ class RequestTest extends TestCase {
 	}
 
 	public function testIsAjax() {
-		$this->assertFalse($this->request1->isAjax());
-		$this->assertTrue($this->request2->isAjax());
+		$this->assertFalse($this->request1->isXmlHttpRequest());
+		$this->assertTrue($this->request2->isXmlHttpRequest());
 	}
 
 	public function testGet() {
-		$this->assertSame('3', $this->request1->get('page'));
-		$this->assertSame('3', $this->request2->get('page'));
-		$this->assertNull($this->request1->get('non-existent'));
-		$this->assertNull($this->request2->get('non-existent'));
+		$this->assertSame('3', $this->request1->getQuery('page'));
+		$this->assertSame('3', $this->request2->getQuery('page'));
+		$this->assertNull($this->request1->getQuery('non-existent'));
+		$this->assertNull($this->request2->getQuery('non-existent'));
 	}
 
 	public function testPost() {
-		$this->assertNull($this->request1->post('non-existent'));
-		$this->assertNull($this->request2->post('non-existent'));
-		$this->assertEquals('frane', $this->request2->post('ante'));
+		$this->assertNull($this->request1->getPost('non-existent'));
+		$this->assertNull($this->request2->getPost('non-existent'));
+		$this->assertEquals('frane', $this->request2->getPost('ante'));
 	}
 
 	public function testCookie() {
-		$this->assertSame('1', $this->request1->cookie('remember'));
-		$this->assertSame('1', $this->request2->cookie('remember'));
-		$this->assertNull($this->request1->cookie('non-existent'));
-		$this->assertNull($this->request2->cookie('non-existent'));
+		$this->assertSame('1', $this->request1->getCookie('remember'));
+		$this->assertSame('1', $this->request2->getCookie('remember'));
+		$this->assertNull($this->request1->getCookie('non-existent'));
+		$this->assertNull($this->request2->getCookie('non-existent'));
 	}
 
 }
