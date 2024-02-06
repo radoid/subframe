@@ -25,7 +25,7 @@ class App {
 	public function __construct(array $middlewares = []) {
 		$this->router = new Router();
 
-		$routerMiddleware = function (Request $request, Closure $next): ResponseInterface {
+		$routerMiddleware = function (Request $request, Closure $next): Response {
 			$response = $this->router->handle($request);
 			if ($response)
 				return $response;
@@ -97,7 +97,7 @@ class App {
 	 * @param string|array $filename The view's filename
 	 */
 	public function catchView($filename, array $data = []): self {
-		$this->middlewareHandler->add(function (Request $request, Closure $next) use ($filename, $data): ResponseInterface {
+		$this->middlewareHandler->add(function (Request $request, Closure $next) use ($filename, $data): Response {
 			try {
 				$response = $next($request);
 			} catch (Throwable $e) {
@@ -124,7 +124,7 @@ class App {
 	 * Defines a closure that is to be called in case of an uncaught exception
 	 */
 	public function catch(Closure $closure): self {
-		$this->middlewareHandler->add(function (Request $request, Closure $next) use ($closure): ResponseInterface {
+		$this->middlewareHandler->add(function (Request $request, Closure $next) use ($closure): Response {
 			try {
 				$response = $next($request);
 			} catch (Throwable $e) {
@@ -170,7 +170,7 @@ class App {
 	/**
 	 * Starts processing of the given request
 	 */
-	public function handle(RequestInterface $request): void {
+	public function handle(Request $request): void {
 		$response = $this->middlewareHandler->handle($request);
 		$response->send();
 	}

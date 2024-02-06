@@ -47,8 +47,8 @@ class Router {
 	/**
 	 * Tries to dispatch the given request among defined routes, returns one's Response if found
 	 */
-	public function handle(RequestInterface $request): ?Response {
-		Container::set(RequestInterface::class, $request);
+	public function handle(Request $request): ?Response {
+		Container::set(Request::class, $request);
 		
 		foreach ($this->routes as [$method, $uri, $action]) {
 			if ($method)
@@ -69,7 +69,7 @@ class Router {
 	 * @param string $namespace The namespace; the root namespace if empty
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 */
-	private function tryNamespace(RequestInterface $request, string $namespace): ?Response {
+	private function tryNamespace(Request $request, string $namespace): ?Response {
 		if (($route = $this->findRouteInNamespace($request, $namespace))) {
 			[$class, $action, $args] = $route;
 			$instance = Container::get($class);
@@ -82,14 +82,14 @@ class Router {
 
 	/**
 	 * Tries to match a route to the given request, and returns the provided callable's response if matched
-	 * @param RequestInterface $request
+	 * @param Request $request
 	 * @param string $method The HTTP request method
 	 * @param string $uri The URI for the route, without trailing slash or query parameters
 	 * @param callable|string $callable A closure or [Controller, action] combination
 	 * @param array $classArgs Optional arguments to the found class' constructor
 	 * @return ?Response
 	 */
-	private function tryRoute(RequestInterface $request, string $method, string $uri, $callable): ?Response {
+	private function tryRoute(Request $request, string $method, string $uri, $callable): ?Response {
 		$requestUri = '/' . trim(strtok($request->getUri(), '?'), '/');
 		
 		if ($method == $request->getMethod() && preg_match("~^$uri$~", $requestUri, $matches)) {
@@ -110,7 +110,7 @@ class Router {
 	/**
 	 * Tries to match a route to the request, and returns its response if matched
 	 */
-	private function tryViewRoute(RequestInterface $request, string $uri, string $filename, array $data = []): ?Response {
+	private function tryViewRoute(Request $request, string $uri, string $filename, array $data = []): ?Response {
 		$uri = '/' . trim($uri, '/');
 		$requestUri = '/' . trim(strtok($request->getUri(), '?'), '/');
 
@@ -146,7 +146,7 @@ class Router {
 	/**
 	 * Tries to find a route within a namespace
 	 */
-	public function findRouteInNamespace(RequestInterface $request, string $namespace): ?array {
+	public function findRouteInNamespace(Request $request, string $namespace): ?array {
 		$method = $request->getMethod();
 		$uri = trim($request->getUri(), '/');
 		$argv = ($uri !== '' ? explode('/', $uri) : []);

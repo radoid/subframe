@@ -31,7 +31,7 @@ class MiddlewareHandler implements RequestHandlerInterface {
 	 * Processes the given request
 	 * @throws Exception
 	 */
-	public function handle(RequestInterface $request): ResponseInterface {
+	public function handle(Request $request): Response {
 		if (!$this->middlewares)
 			throw new \Exception('Middleware stack is empty.', 500);
 		$current = array_pop($this->middlewares);

@@ -9,6 +9,6 @@ interface RequestHandlerInterface {
 	/**
 	 * Implements the processing
 	 */
-	public function handle(RequestInterface $request): ResponseInterface;
+	public function handle(Request $request): Response;
 
 }

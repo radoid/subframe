@@ -6,7 +6,7 @@ use Throwable;
 /**
  * Represents a response to an HTTP request
  */
-class Response implements ResponseInterface {
+class Response {
 
 	/**
 	 * HTTP status code
@@ -115,7 +115,7 @@ class Response implements ResponseInterface {
 	/**
 	 * Adds a new header field to the response, returning a new instance
 	 */
-	public function withHeader(string $name, string $value): ResponseInterface {
+	public function withHeader(string $name, string $value): Response {
 		$name = $this->capitalizeHeader($name);
 		$headers = [$name => $value] + $this->headers;
 		return new self($this->body, $this->statusCode, $headers);
@@ -124,7 +124,7 @@ class Response implements ResponseInterface {
 	/**
 	 * Removes a header field, if present, from the response, returning a new instance
 	 */
-	public function withoutHeader(string $name): ResponseInterface {
+	public function withoutHeader(string $name): Response {
 		$name = $this->capitalizeHeader($name);
 		$headers = $this->getHeaders();
 		unset($headers[$name]);

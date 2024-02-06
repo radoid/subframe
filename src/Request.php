@@ -6,7 +6,7 @@ use Exception;
 /**
  * Represents an HTTP request
  */
-class Request implements RequestInterface {
+class Request {
 
 	/**
 	 * The request's HTTP method
